@@ -1,0 +1,18 @@
+{
+  "name": "claude-command-center",
+  "version": "0.2.0",
+  "description": "Live dashboard of every Claude Code session: what is running, what needs you, what is done.",
+  "license": "MIT",
+  "keywords": ["claude", "claude-code", "dashboard", "hooks"],
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node demo.js",
+    "install-hooks": "node install.js",
+    "uninstall-hooks": "node install.js --uninstall",
+    "service:install": "node service.js install",
+    "service:restart": "node service.js restart",
+    "service:status": "node service.js status",
+    "service:uninstall": "node service.js uninstall"
+  },
+  "engines": { "node": ">=18" }
+}

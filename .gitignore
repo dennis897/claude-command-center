@@ -1,0 +1,12 @@
+node_modules/
+*.log
+*.pid
+*.bak-*
+.DS_Store
+Thumbs.db
+# Runtime data lives in ~/.claude/command-center, but never commit it if copied here
+events.jsonl
+scratchpad.json
+projects.json
+archived.json
+hidden.json
