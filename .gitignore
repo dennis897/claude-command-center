@@ -10,3 +10,6 @@ scratchpad.json
 projects.json
 archived.json
 hidden.json
+
+# Personal Claude Code settings (permissions) stay local
+.claude/settings.local.json
