@@ -56,6 +56,40 @@ process.stdin.on('end', () => {
     if (e.tool_response && e.tool_response.is_error) out.err = true;
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.appendFileSync(path.join(DATA_DIR, 'events.jsonl'), JSON.stringify(out) + '\n');
+    if (e.hook_event_name === 'PermissionRequest' && !NOT_HELD.has(e.tool_name)) return hold(e);
   } catch (_) { /* never break the session */ }
   process.exit(0);
 });
+
+// Approve from the board. While Away mode is on, the server keeps this request open
+// until you decide on the board (or hand it back, or it times out) and answers with
+// the decision, which is printed as the hook's output. With Away mode off, the server
+// isn't running, or anything goes wrong, nothing is printed and the session shows its
+// own permission dialog as usual.
+// AskUserQuestion and ExitPlanMode need answers the board can't give, so they're never held.
+const NOT_HELD = new Set(['AskUserQuestion', 'ExitPlanMode']);
+function hold(e) {
+  const http = require('http');
+  const done = (decision) => {
+    if (decision && (decision.behavior === 'allow' || decision.behavior === 'deny')) {
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } }));
+    }
+    process.exit(0);
+  };
+  const body = JSON.stringify({
+    sid: e.session_id, cwd: e.cwd, tool: e.tool_name, input: e.tool_input,
+    suggestions: Array.isArray(e.permission_suggestions) ? e.permission_suggestions : [],
+  });
+  const req = http.request({
+    host: '127.0.0.1', port: Number(process.env.CC_PORT || 4317), path: '/api/holds', method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CC': '1', 'Content-Length': Buffer.byteLength(body) },
+  }, (res) => {
+    let b = '';
+    res.setEncoding('utf8');
+    res.on('data', (c) => { b += c; });
+    res.on('end', () => { try { done(res.statusCode === 200 ? JSON.parse(b).decision : null); } catch (_) { done(null); } });
+    res.on('error', () => done(null));
+  });
+  req.on('error', () => done(null)); // server not running: fall through at once
+  req.end(body);
+}

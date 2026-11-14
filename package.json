@@ -1,6 +1,6 @@
 {
   "name": "claude-command-center",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Live dashboard of every Claude Code session: what is running, what needs you, what is done.",
   "license": "MIT",
   "keywords": ["claude", "claude-code", "dashboard", "hooks"],

@@ -704,7 +704,8 @@ function snapshot() {
   for (const s of sessions.values()) {
     const needsMs = s.needsMs + (s.status === 'needs' ? now - s.statusSince : 0);
     if (s.lastAt >= startOfDay.getTime()) waitedToday += needsMs;
-    if (s.ended || hidden.has(s.id)) continue;
+    const hold = [...holds.values()].find((h) => h.sid === s.id);
+    if (s.ended || (hidden.has(s.id) && !hold)) continue;
     // A finished turn with background jobs still going is running, as the app shows it.
     const job = s.status === 'done' ? jobs.get(s.id) : null;
     // Finished sessions fade off the board after 24 h of silence.
@@ -728,10 +729,91 @@ function snapshot() {
       errors: s.errors, recap: s.recap, lastPrompt: s.lastPrompt,
       stale: !job && (s.status !== 'done') && now - s.lastAt > STALE_MS,
       events: s.events.slice(-25),
+      hold: hold ? holdView(hold) : null,
     });
   }
   lastModel = buildModel(list);
-  return { now, waitedTodayMs: waitedToday, sessions: list, projects: lastModel.projects, history: lastModel.history, scratch };
+  return { now, away: !!settings.away, waitedTodayMs: waitedToday, sessions: list, projects: lastModel.projects, history: lastModel.history, scratch };
+}
+
+// ---------- approvals from the board (Away mode) ----------
+// hook.js posts each PermissionRequest here. With Away mode off it is answered at
+// once with nothing, and the session shows its own dialog. With it on, the request is
+// held open until you decide on the board, hand it back, or HOLD_MS passes; the hook
+// prints the decision and Claude Code applies it. A hook's "allow" can't override a
+// deny or ask rule in your settings: Claude Code still checks those.
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+let settings = { away: false, ...readJson(SETTINGS_FILE, {}) };
+const HOLD_MS = 30 * 60e3; // install.js gives the hook a little longer than this
+const holds = new Map();   // id -> { id, sid, tool, text, rules, createdAt, expiresAt, res, timer }
+
+function holdText(tool, input) {
+  if (!input || typeof input !== 'object') return String(input || '');
+  const clipS = (s, n) => (s.length > n ? s.slice(0, n) + '\n…' : s);
+  if (typeof input.command === 'string') return clipS(input.command, 3000) + (input.description ? `\n\n# ${input.description}` : '');
+  if (typeof input.file_path === 'string' && typeof input.old_string === 'string') {
+    const diff = (p, s) => s.split('\n').map((l) => p + ' ' + l).join('\n');
+    return `${input.file_path}\n\n${clipS(diff('-', input.old_string), 1500)}\n${clipS(diff('+', input.new_string || ''), 1500)}`;
+  }
+  if (typeof input.file_path === 'string' && typeof input.content === 'string') return `${input.file_path}\n\n${clipS(input.content, 2500)}`;
+  return clipS(JSON.stringify(input, null, 2), 3000);
+}
+// "Always allow" offers only the allow rules Claude Code itself suggested.
+function allowRules(suggestions) {
+  return (Array.isArray(suggestions) ? suggestions : [])
+    .filter((s) => s && s.type === 'addRules' && s.behavior === 'allow' && Array.isArray(s.rules) && s.rules.length)
+    .slice(0, 4);
+}
+const ruleLabel = (rules) => rules.flatMap((s) => s.rules.map((r) => (r.ruleContent ? `${r.toolName}(${r.ruleContent})` : r.toolName))).join(', ');
+
+function endHold(h, decision) {
+  if (!holds.delete(h.id)) return;
+  clearTimeout(h.timer);
+  if (!h.res.writableEnded) decision ? json(h.res, 200, { decision }) : json(h.res, 204);
+  push();
+}
+
+function newHold(req, res, body) {
+  if (!settings.away || typeof body.sid !== 'string') return json(res, 204);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const rules = allowRules(body.suggestions);
+  const h = {
+    id, sid: body.sid, tool: str(body.tool, 200) || 'Tool', text: holdText(body.tool, body.input),
+    rules, rulesLabel: ruleLabel(rules), createdAt: Date.now(), expiresAt: Date.now() + HOLD_MS, res,
+  };
+  h.timer = setTimeout(() => endHold(h, null), HOLD_MS);
+  // The session ended or the hook was cancelled: drop it from the board.
+  res.on('close', () => { if (holds.has(id)) { holds.delete(id); clearTimeout(h.timer); push(); } });
+  holds.set(id, h);
+  push();
+}
+
+function decideHold(res, id, body) {
+  const h = holds.get(id);
+  if (!h) return json(res, 404, { error: 'This request has already been answered or has timed out' });
+  const action = body.action;
+  const s = sessions.get(h.sid);
+  const note = (text) => { if (s) { s.events.push({ ts: Date.now(), kind: 'Board', text }); if (s.events.length > 40) s.events.shift(); } };
+  if (action === 'allow' || (action === 'always' && h.rules.length)) {
+    const decision = { behavior: 'allow' };
+    if (action === 'always') decision.updatedPermissions = h.rules;
+    note(action === 'always' ? `Always allowed ${h.rulesLabel}` : `Allowed ${h.tool}`);
+    if (s) { setStatus(s, 'running', 'Working', Date.now()); s.detail = null; }
+    endHold(h, decision);
+  } else if (action === 'deny') {
+    const message = (str(body.message, 1000) || '').trim() || 'The user denied this from the Command Center.';
+    note(`Denied ${h.tool}${body.message ? ': ' + message : ''}`);
+    if (s) { setStatus(s, 'running', 'Working', Date.now()); s.detail = null; }
+    endHold(h, { behavior: 'deny', message });
+  } else if (action === 'release') {
+    note('Handed back to the session');
+    endHold(h, null);
+  } else return json(res, 400, { error: 'action must be allow, always, deny or release' });
+  return json(res, 204);
+}
+
+function holdView(h) {
+  return { id: h.id, tool: h.tool, text: h.text, always: h.rules.length ? h.rulesLabel : null, createdAt: h.createdAt, expiresAt: h.expiresAt };
 }
 
 // ---------- http ----------
@@ -749,10 +831,10 @@ function saveHidden() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(HIDDEN_FILE, JSON.stringify([...hidden])); } catch (_) {}
 }
 
-function readBody(req) {
+function readBody(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
     let b = '';
-    req.on('data', (c) => { b += c; if (b.length > 64 * 1024) { reject(new Error('too large')); req.destroy(); } });
+    req.on('data', (c) => { b += c; if (b.length > limit) { reject(new Error('too large')); req.destroy(); } });
     req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch (e) { reject(e); } });
     req.on('error', reject);
   });
@@ -854,7 +936,7 @@ const server = http.createServer((req, res) => {
   // A small summary for the Claude desktop pane (polled by every open session).
   if (url.pathname === '/api/pane' && req.method === 'GET') {
     const s = snapshot();
-    const pick = (x) => ({ id: x.id, title: x.title, project: x.project, kind: x.kind, detail: x.detail ? String(x.detail).slice(0, 160) : null, now: x.now ? String(x.now).slice(0, 120) : null, since: x.statusSince, turnStartedAt: x.turnStartedAt, desktopId: x.desktopId || null, stale: !!x.stale });
+    const pick = (x) => ({ id: x.id, title: x.title, project: x.project, kind: x.kind, detail: x.detail ? String(x.detail).slice(0, 160) : null, now: x.now ? String(x.now).slice(0, 120) : null, since: x.statusSince, turnStartedAt: x.turnStartedAt, desktopId: x.desktopId || null, stale: !!x.stale, hold: x.hold ? { id: x.hold.id, tool: x.hold.tool, text: String(x.hold.text).slice(0, 300), always: x.hold.always } : null });
     const by = (st) => s.sessions.filter((x) => x.status === st);
     return json(res, 200, {
       now: s.now,
@@ -863,6 +945,7 @@ const server = http.createServer((req, res) => {
       running: by('running').map(pick),
       done: by('done').filter((x) => x.kind !== 'Ready').sort((a, b) => b.statusSince - a.statusSince).slice(0, 8).map(pick),
       todos: s.scratch.filter((t) => !t.doneAt).length,
+      away: s.away,
     });
   }
   if (url.pathname === '/api/state') {
@@ -874,6 +957,24 @@ const server = http.createServer((req, res) => {
     // CORS preflight, which this server never approves, so other web pages can't
     // change anything here.
     if (req.headers['x-cc'] !== '1') { res.writeHead(403); return res.end('forbidden'); }
+  }
+  // Approvals: the hook posts a permission request; the board decides it.
+  if (url.pathname === '/api/holds' && req.method === 'POST') {
+    return readBody(req, 4 << 20).then((body) => newHold(req, res, body)).catch(() => json(res, 204));
+  }
+  const hm = /^\/api\/holds\/(\w+)$/.exec(url.pathname);
+  if (hm && req.method === 'POST') {
+    return readBody(req).then((body) => decideHold(res, hm[1], body)).catch(() => json(res, 400, { error: 'bad request' }));
+  }
+  // Away mode on or off. Turning it off hands every held request back to its session.
+  if (url.pathname === '/api/settings' && req.method === 'POST') {
+    return readBody(req).then((body) => {
+      if ('away' in body) settings.away = !!body.away;
+      writeJson(SETTINGS_FILE, settings);
+      if (!settings.away) for (const h of [...holds.values()]) endHold(h, null);
+      push();
+      json(res, 204);
+    }).catch(() => json(res, 400, { error: 'bad request' }));
   }
   // Open a session in the Claude desktop app. Only an id the app itself recorded can be
   // opened, and the link is fixed: claude://code/continue?session=local_<id>.

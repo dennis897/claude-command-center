@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const DIR = path.join(os.tmpdir(), 'claude-command-center-demo');
 fs.rmSync(DIR, { recursive: true, force: true });
@@ -30,6 +30,8 @@ fs.writeFileSync(path.join(DIR, 'projects.json'), JSON.stringify({
   [key('mobile-app')]: { cwd: cwdOf('mobile-app'), group: 'Product', color: '#5AA9FF' },
   [key('claude-mods')]: { cwd: cwdOf('claude-mods'), group: 'Claude tooling', pinned: true },
 }, null, 2));
+// Away mode on, so the demo shows a permission request waiting for a decision on the board.
+fs.writeFileSync(path.join(DIR, 'settings.json'), JSON.stringify({ away: true }));
 // Run the server in this same process, so stopping the demo stops the server too.
 process.env.CC_DATA_DIR = DIR;
 require('./server.js');
@@ -65,11 +67,33 @@ const script = [
   [600, 'demo-3', 'mobile-app', 'PreToolUse', { tool_name: 'AskUserQuestion', tool_input: { questions: [{ question: 'Keep the old onboarding flow behind a flag, or remove it?' }] } }],
 ];
 
+// A held permission request: the hook waits for the board's answer, so it runs in the
+// background, and what the hook prints (the decision) is logged.
+function held(sid, cwd, tool, input, suggestions) {
+  const payload = { session_id: sid, cwd, transcript_path: '', hook_event_name: 'PermissionRequest', tool_name: tool, tool_input: input, permission_suggestions: suggestions };
+  hook(sid, cwd, 'PreToolUse', { tool_name: tool, tool_input: input });
+  const c = spawn(process.execPath, [path.join(__dirname, 'hook.js')], { env });
+  let out = '';
+  c.stdout.on('data', (d) => { out += d; });
+  c.on('close', () => {
+    console.log(`[demo] hook answered: ${out || '(nothing: the session would show its own dialog)'}`);
+    if (out.includes('"allow"')) {
+      hook(sid, cwd, 'PostToolUse', { tool_name: tool, tool_input: input, tool_response: {} });
+      hook(sid, cwd, 'Stop', {});
+    }
+  });
+  c.stdin.end(JSON.stringify(payload));
+}
+
 (async () => {
   for (const [delay, sid, proj, ev, extra, entry] of script) {
     if (delay) await new Promise((r) => setTimeout(r, delay));
     hook(sid, P(proj), ev, extra, entry);
   }
+  await new Promise((r) => setTimeout(r, 600));
+  hook('demo-8', P('web-app'), 'UserPromptSubmit', { prompt: 'Ship the billing migration to staging' });
+  held('demo-8', P('web-app'), 'Bash', { command: 'npm run db:migrate -- --env staging', description: 'Run the pending migrations on staging' },
+    [{ type: 'addRules', rules: [{ toolName: 'Bash', ruleContent: 'npm run db:migrate:*' }], behavior: 'allow', destination: 'localSettings' }]);
   // Keep the running sessions busy so the board stays alive.
   const tools = [['Edit', { file_path: 'src/server.ts' }], ['Bash', { command: 'npm test' }], ['Grep', { pattern: 'TODO', path: 'src' }], ['Read', { file_path: 'README.md' }]];
   let i = 0;

@@ -17,7 +17,8 @@ const EVENTS = [
   'PostToolUseFailure', 'PermissionRequest', 'Notification', 'Stop', 'SubagentStop', 'PreCompact',
 ];
 const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest']);
-const uninstall = process.argv.includes('--uninstall');
+const HOLD_TIMEOUT_S = 1900;
+const uninstall =process.argv.includes('--uninstall');
 
 let settings = {};
 if (fs.existsSync(SETTINGS)) {
@@ -43,7 +44,9 @@ if (!uninstall) {
   fs.copyFileSync(path.join(__dirname, 'hook.js'), TARGET);
   const command = `node "${TARGET.replace(/\\/g, '/')}"`;
   for (const ev of EVENTS) {
-    const group = { hooks: [{ type: 'command', command, timeout: 5 }] };
+    // PermissionRequest can wait on the board in Away mode (the server gives up after
+    // 30 minutes), so it gets a longer timeout than the others.
+    const group = { hooks: [{ type: 'command', command, timeout: ev === 'PermissionRequest' ? HOLD_TIMEOUT_S : 5 }] };
     if (TOOL_EVENTS.has(ev)) group.matcher = '*';
     (settings.hooks[ev] = settings.hooks[ev] || []).push(group);
   }

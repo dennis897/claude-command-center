@@ -215,6 +215,15 @@ aside.drawer.open{transform:none}
 .act .ev{padding:10px 0}
 .act .ev .k{width:84px}
 .act .ev .x{max-height:6.2em;overflow:hidden}
+.hold{display:flex;flex-direction:column;gap:8px}
+.hold .code{max-height:14em;overflow:auto}
+.hold .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn.deny{border-color:#4A2A2A;color:#FFB0B0}.btn.deny:hover{background:#2A1818}
+.hold .exp{color:#B9A47C;font-size:12px}
+.hold textarea{background:var(--bg);border:1px solid #3A2E16;border-radius:8px;color:var(--text);font:13px Inter,sans-serif;padding:8px 10px;min-height:2.6em;resize:vertical}
+.awaybar{display:flex;align-items:center;gap:10px;background:#17140D;border:1px solid #4A3A1C;border-radius:12px;padding:10px 14px;color:#E9DCC2;font-size:13px}
+.awaybar b{color:var(--amber-t)}
+.toggle-note{padding:0 12px 0 38px;color:var(--dim);font-size:11.5px;line-height:1.4}
 .waitbox{background:var(--amber-bg);border:1px solid #5A4520;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:12px;animation:glow 3s ease-in-out infinite}
 .pi{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;line-height:1.4}
 .pi i{width:18px;height:18px;border-radius:50%;flex-shrink:0;margin-top:1px;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:700;color:var(--bg)}
@@ -280,6 +289,11 @@ aside.drawer.open{transform:none}
       <label class="toggle"><input type="checkbox" id="notify"> Desktop notifications</label>
       <label class="toggle"><input type="checkbox" id="sound"> Chime when needed</label>
     </div>
+    <div>
+      <div class="sec-h">Approvals</div>
+      <label class="toggle"><input type="checkbox" id="away"> Away mode</label>
+      <div class="toggle-note">Permission requests wait here for you to allow or deny, instead of in the session.</div>
+    </div>
     <div class="conn" id="conn"><i></i><span>Connecting…</span></div>
   </nav>
 
@@ -305,6 +319,7 @@ aside.drawer.open{transform:none}
       <div class="stat s-wait"><div class="lb">Waited on you today</div><div class="n" id="n-wait">0m</div><div class="ft">time sessions sat blocked on you</div></div>
     </section>
 
+    <div class="awaybar" id="awaybar" hidden><b>Away mode is on.</b><span style="flex:1">Permission requests wait on this board. Sessions won't show their own dialog until you answer here or hand the request back.</span><button class="btn" type="button" id="away-off">Turn off</button></div>
     <div class="filterbar" id="filterbar" hidden></div>
     <div class="work">
     <section class="board" aria-label="Sessions by status">
@@ -473,9 +488,24 @@ function needsCard(s) {
   return `<article class="card c-needs" tabindex="0" data-id="${esc(s.id)}">
     <div class="row"><span class="chip" style="background:var(--amber-chip);color:var(--amber-t)">${esc(s.kind)}</span>${s.stale ? '<span class="chip stale">stale</span>' : ''}<span style="flex:1"></span><span class="t">${D(s.statusSince, 'waiting ')}</span></div>
     <div><div class="ttl">${esc(s.title)}</div><div class="meta" style="margin-top:3px">${meta(s)}</div></div>
-    ${s.detail ? `<div class="code">${esc(s.detail)}</div>` : ''}
-    <div class="acts">${s.desktopId ? `<button class="btn pri" type="button" data-act="open-app" data-sid="${esc(s.id)}">Open in Claude</button><button class="btn" type="button" data-act="details">Details</button>` : `<button class="btn pri" type="button" data-act="details">Details</button><button class="btn" type="button" data-act="copy">Copy resume command</button>`}</div>
+    ${s.hold ? holdBox(s.hold, false) : `${s.detail ? `<div class="code">${esc(s.detail)}</div>` : ''}
+    <div class="acts">${s.desktopId ? `<button class="btn pri" type="button" data-act="open-app" data-sid="${esc(s.id)}">Open in Claude</button><button class="btn" type="button" data-act="details">Details</button>` : `<button class="btn pri" type="button" data-act="details">Details</button><button class="btn" type="button" data-act="copy">Copy resume command</button>`}</div>`}
   </article>`;
+}
+// A permission request held for the board (Away mode): what Claude wants to run, and
+// the decision buttons. The Focus page adds a reason box for Deny.
+function holdBox(h, full) {
+  return `<div class="hold" data-hold="${esc(h.id)}">
+    <div class="code"><b>${esc(h.tool)}</b>${'\n'}${esc(h.text)}</div>
+    ${full ? '<textarea class="deny-msg" placeholder="Reason for Claude if you deny (optional)" aria-label="Reason for denying"></textarea>' : ''}
+    <div class="acts">
+      <button class="btn pri" type="button" data-act="hold-allow">Allow</button>
+      ${h.always ? `<button class="btn" type="button" data-act="hold-always" title="Adds the rule ${esc(h.always)} to your settings">Always allow ${esc(h.always.length > 40 ? h.always.slice(0, 39) + '…' : h.always)}</button>` : ''}
+      <button class="btn deny" type="button" data-act="hold-deny">Deny</button>
+      <button class="linkbtn" type="button" data-act="hold-release" title="The session shows its own permission dialog">Hand back to session</button>
+    </div>
+    <div class="exp">Waiting here until ${hm(h.expiresAt)}, then the session asks you itself.</div>
+  </div>`;
 }
 function runCard(s) {
   const since = s.turnStartedAt || s.statusSince;
@@ -838,6 +868,9 @@ function renderFocus() {
       acts.slice().reverse().map((e) => `<div class="ev ${kindClass(e.kind)}"><span class="tm">${e.ts ? hm(e.ts) : ''}</span><span class="k">${esc(e.kind)}</span><span class="x">${esc(e.text)}</span></div>`).join('') +
       (d.activity.length > acts.length ? `<button class="linkbtn" type="button" id="focus-more" style="padding:10px 0">Show ${d.activity.length - acts.length} earlier</button>` : '');
 
+  // Keep a half-typed Deny reason across live redraws.
+  const dm = $('fmain').querySelector('.deny-msg');
+  const keep = dm && { hold: dm.closest('[data-hold]').dataset.hold, value: dm.value, focused: document.activeElement === dm, at: dm.selectionStart };
   $('fmain').innerHTML = `
     <header style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px">
       <div style="flex:1;min-width:260px">
@@ -860,13 +893,17 @@ function renderFocus() {
     ${f.status === 'needs' ? `<section class="waitbox" aria-label="Waiting for you">
       <div style="display:flex;align-items:center;gap:10px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFC977" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
         <h2 style="margin:0;font-size:15px;font-weight:600;color:#FFE2B0">${f.kind === 'Permission' ? 'Claude wants your permission' : f.kind === 'Plan review' ? 'Claude has a plan for you to review' : f.kind === 'Question' ? 'Claude has a question' : 'Claude is waiting for you'}</h2></div>
-      ${f.detail ? `<div class="code" style="border-color:#2B2416;color:#F2E6CC;max-height:none;font-size:13px">${esc(f.detail)}</div>` : ''}
-      <div style="color:#C9B48A;font-size:13px">Answer it in the session itself${f.host === 'Desktop' ? ' (in the Claude desktop app)' : f.host === 'Terminal' ? ' (in its terminal)' : ''}.</div>
+      ${f.s && f.s.hold ? holdBox(f.s.hold, true) : `${f.detail ? `<div class="code" style="border-color:#2B2416;color:#F2E6CC;max-height:none;font-size:13px">${esc(f.detail)}</div>` : ''}
+      <div style="color:#C9B48A;font-size:13px">Answer it in the session itself${f.host === 'Desktop' ? ' (in the Claude desktop app)' : f.host === 'Terminal' ? ' (in its terminal)' : ''}.${f.kind === 'Permission' && !state.away ? ' Turn on Away mode to answer permission requests here.' : ''}</div>`}
     </section>` : ''}
     ${f.status !== 'running' && ((d && d.lastReply) || f.recap) ? `<section class="side-card"><h3 style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)">Last reply</h3><div style="color:var(--soft);white-space:pre-wrap;line-height:1.55;max-height:16em;overflow:auto">${esc((d && d.lastReply) || f.recap)}</div></section>` : ''}
     <section aria-label="Activity"><div class="h2row" style="margin-bottom:8px"><h2>Activity</h2><span class="meta" style="color:var(--dim);font-size:12px">newest first</span></div>
       <div class="act">${activity}</div></section>`;
 
+  if (keep) {
+    const n = $('fmain').querySelector(`[data-hold="${keep.hold}"] .deny-msg`);
+    if (n) { n.value = keep.value; if (keep.focused) { n.focus(); n.setSelectionRange(keep.at, keep.at); } }
+  }
   // Side: plan, context, files, facts
   const plan = d && d.plan;
   const doneN = plan ? plan.filter((t) => t.status === 'completed').length : 0;
@@ -1133,6 +1170,8 @@ function renderSummary() {
   $('subline').textContent = aNeeds.length
     ? `${aNeeds.length} session${aNeeds.length === 1 ? ' is' : 's are'} waiting on you · oldest for ${dur(oldest)}`
     : all.length ? `${aRun.length} running · nothing needs you` : 'No sessions yet. Start Claude Code anywhere and it shows up here.';
+  $('away').checked = !!state.away;
+  $('awaybar').hidden = !state.away;
   document.title = aNeeds.length ? `(${aNeeds.length}) Command Center` : 'Command Center';
 }
 
@@ -1177,9 +1216,22 @@ async function api(method, url, body) {
   return r;
 }
 const post = (url) => api('POST', url);
+async function decideHold(el, action) {
+  const box = el.closest('[data-hold]');
+  if (!box) return;
+  const msg = box.querySelector('.deny-msg');
+  box.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  const r = await fetch(`/api/holds/${encodeURIComponent(box.dataset.hold)}`, {
+    method: 'POST', headers: { 'X-CC': '1', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, message: msg ? msg.value : '' }),
+  });
+  if (r.ok) toast({ allow: 'Allowed', always: 'Allowed, and the rule was added', deny: 'Denied', release: 'Handed back to the session' }[action]);
+  else { box.querySelectorAll('button').forEach((b) => { b.disabled = false; }); toast(((await r.json().catch(() => ({}))).error) || 'Could not send: ' + r.status); }
+}
 
 function act(action, el) {
   if (action === 'open-app') { openInApp(el.dataset.sid); return; }
+  if (action.startsWith('hold-')) { decideHold(el, action.slice(5)); return; }
   // sessions
   const sid = el.dataset.id || (el.closest('[data-id]') || {}).dataset?.id;
   const s = sid && state.sessions.find((x) => x.id === sid);
@@ -1393,6 +1445,8 @@ $('notify').addEventListener('change', async (e) => {
   }
   store.set('cc-notify', e.target.checked ? '1' : '0');
 });
+$('away').addEventListener('change', (e) => api('POST', '/api/settings', { away: e.target.checked }));
+$('away-off').addEventListener('click', () => api('POST', '/api/settings', { away: false }));
 $('sound').addEventListener('change', (e) => store.set('cc-sound', e.target.checked ? '1' : '0'));
 function chime() {
   try {

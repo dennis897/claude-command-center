@@ -34,13 +34,28 @@ Claude Code session ──hook──▶ hook.js ──append──▶ ~/.claude/
 | Event | Board status |
 |---|---|
 | `UserPromptSubmit`, `PreToolUse`, `PostToolUse` | Running |
-| `Notification` (permission_prompt), `PermissionRequest` | Needs you · Permission |
+| `Notification` (permission_prompt), `PermissionRequest` | Needs you · Permission (in Away mode, with Allow / Deny on the card) |
 | `PreToolUse` on `AskUserQuestion` / `ExitPlanMode` | Needs you · Question / Plan review |
 | `Stop` | Done (with Claude's last reply as the recap) |
 | `SessionStart` | Done · Ready for a prompt |
 | `SessionEnd` | Removed from the board |
 
 The server needs no dependencies, only Node 18 or newer.
+
+## Approve from the board (Away mode)
+
+Turn on **Away mode** (sidebar, under Approvals) and permission requests wait on the board instead of in the session. Each one shows what Claude wants to run (the command, or the file and the lines it changes) with:
+- **Allow:** this once.
+- **Always allow `<rule>`:** allow it and add the rule Claude Code suggested (for example `Bash(npm test:*)`) to the project's settings, so it won't ask again. It only appears when Claude Code offers a rule.
+- **Deny:** Claude is told no. On the Focus page you can add a reason, which Claude reads.
+- **Hand back to session:** the session shows its own permission dialog.
+
+How it works: the `PermissionRequest` hook asks the server whether to hold the request. With Away mode off, or the server not running, it returns at once and nothing changes. With it on, the hook waits until you decide, then prints the decision and Claude Code applies it. While a request is held, the session doesn't show its own dialog, so turn Away mode off when you're back at your desk. Turning it off hands every held request back. A request waits at most 30 minutes, then the session asks you itself.
+
+- An **allow** here can't override a deny or ask rule in your Claude Code settings. Claude Code still checks those.
+- Questions (`AskUserQuestion`) and plan reviews (`ExitPlanMode`) are never held: answer those in the session.
+- Away mode is saved in `~/.claude/command-center/settings.json`.
+- After updating, run `node install.js` again: it gives the `PermissionRequest` hook a 1900 s timeout so it can wait.
 
 ## Scratchpad
 
@@ -89,7 +104,7 @@ Every session in every project, grouped by project, project group, status or day
 - **Archive** only hides a session in this dashboard (`archived.json`). The desktop app's own archive isn't readable from here.
 - **Remove worktree** runs `git worktree remove` without `--force`. Git refuses if the worktree has uncommitted or untracked changes, and the branch is kept. It asks for confirmation first and refuses for a worktree with a session still working in it.
 
-Every change the dashboard makes must carry an `X-CC` header. Other websites can't add that header to a request without your server's approval, and the server never gives it, so they can't change your data.
+Every change the dashboard makes must carry an `X-CC` header, including Allow and Deny. Other websites can't add that header to a request without your server's approval, and the server never gives it, so they can't change your data.
 
 ## Use it
 
@@ -121,8 +136,9 @@ If you run `node server.js` yourself while the task is running, the second copy 
 
 On macOS or Linux, `node service.js` prints a launchd / systemd recipe that runs `supervise.js` instead.
 
-## Limits (v0.2)
+## Limits (v0.3)
 
-- **Read-only.** It shows which session needs you, but you still answer in that session. The `PermissionRequest` hook can return allow or deny, so approving from the board is possible next.
+- **Questions and plan reviews** are answered in the session. Permission requests can be answered on the board with [Away mode](#approve-from-the-board-away-mode).
+- **Away mode is all or nothing.** While it's on, every session's permission requests wait on the board, including the one you're sitting at.
 - **Cloud sessions** run their hooks on the remote machine, so they don't show up here.
 - A session whose terminal is killed without a `SessionEnd` event stays on the board and is flagged **stale** after 20 minutes. You can clear it.

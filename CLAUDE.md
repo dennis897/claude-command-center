@@ -8,7 +8,10 @@ it accurate when behaviour changes.
 
 - `hook.js` is a Claude Code hook. It appends one JSON line per event to
   `~/.claude/command-center/events.jsonl`. It must stay fast, print nothing and always
-  exit 0, because it runs inside every session.
+  exit 0, because it runs inside every session. The one exception: on
+  `PermissionRequest` it asks the server whether to hold the request (Away mode) and,
+  if so, waits for the board's decision and prints it. With Away mode off or the
+  server down it must still return at once with no output.
 - `install.js` adds or removes the hooks in `~/.claude/settings.json` (it backs that
   file up first) and copies `hook.js` to `~/.claude/command-center/`.
 - `server.js` tails the events and transcripts (`~/.claude/projects`) and the desktop
