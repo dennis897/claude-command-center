@@ -18,7 +18,12 @@ const EVENTS = [
 ];
 const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionRequest']);
 const HOLD_TIMEOUT_S = 1900;
-const uninstall =process.argv.includes('--uninstall');
+// doctor.js reads these to check what's installed.
+module.exports = { CLAUDE_DIR, SETTINGS, TARGET, MARK, EVENTS, TOOL_EVENTS, HOLD_TIMEOUT_S };
+if (require.main === module) main();
+
+function main() {
+const uninstall = process.argv.includes('--uninstall');
 
 let settings = {};
 if (fs.existsSync(SETTINGS)) {
@@ -58,3 +63,4 @@ fs.writeFileSync(SETTINGS, JSON.stringify(settings, null, 2) + '\n');
 console.log(uninstall
   ? 'Command Center hooks removed. Restart Claude Code sessions to stop logging.'
   : `Command Center hooks installed for ${EVENTS.length} events.\nNew Claude Code sessions will report to ${path.join(TARGET_DIR, 'events.jsonl')}.\nRunning sessions pick it up after a restart.`);
+}

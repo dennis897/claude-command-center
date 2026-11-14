@@ -1,11 +1,12 @@
 {
   "name": "claude-command-center",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Live dashboard of every Claude Code session: what is running, what needs you, what is done.",
   "license": "MIT",
   "keywords": ["claude", "claude-code", "dashboard", "hooks"],
   "scripts": {
     "start": "node server.js",
+    "doctor": "node doctor.js",
     "demo": "node demo.js",
     "install-hooks": "node install.js",
     "uninstall-hooks": "node install.js --uninstall",

@@ -21,6 +21,10 @@ it accurate when behaviour changes.
   taken: another copy is running, not a crash.
 - `service.js` (Windows) copies the app to `~/.claude/command-center/app` and registers
   the "Claude Command Center" scheduled task (at logon, plus every 5 min).
+- `doctor.js` checks the whole setup (hooks, hook copy, background task and copy,
+  server version via `GET /api/health`, events, data files, log) and prints a fix for
+  each problem. It only reads. It imports the constants from `install.js` and
+  `service.js`, so those only run their command when executed directly.
 - `demo.js` runs the server on a temp data folder with simulated sessions.
 
 ## Rules
@@ -37,7 +41,7 @@ it accurate when behaviour changes.
   background copy first, or set `CC_PORT=4318`).
 - **The background copy runs from `~/.claude/command-center/app`, not this folder.**
   After editing, run `node service.js restart` to update it, and
-  `node service.js status` to confirm.
+  `node service.js status` to confirm, or `node doctor.js` to check everything.
 - If `hook.js` changes, run `node install.js` again so the hook copy is updated.
 - When asked to ship: commit with a clear message, then `git push` to `origin main`.
   Bump `version` in package.json for user-visible changes. Never force-push.

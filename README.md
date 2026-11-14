@@ -113,9 +113,30 @@ node demo.js                  # simulated sessions, nothing installed
 node install.js               # add the hooks to ~/.claude/settings.json (backs it up first)
 node server.js                # run it in the foreground, then open http://localhost:4317
 node install.js --uninstall   # remove the hooks
+node doctor.js                # check that everything is set up and working
 ```
 
 Keyboard: `/` search · `J`/`K` move between cards · `Enter` details · `C` copy the resume command · `Esc` close.
+
+## Check your setup (doctor)
+
+```bash
+node doctor.js
+```
+
+It checks each part and says how to fix what isn't right:
+- **Node.js** version.
+- **Claude settings** parse, and hooks aren't turned off.
+- **Hooks** are installed for every event, once each, with the long `PermissionRequest` timeout Away mode needs.
+- **Hook script:** the installed copy matches `hook.js`, and it runs. A test event is written to a throwaway folder, and it must take under 2 s and print nothing.
+- **Background task** is registered and the **background copy** in `~/.claude/command-center/app` matches this folder (Windows).
+- **Server** answers, and runs the same version as this folder.
+- **Events** are arriving, the last line is valid, and `events.jsonl` isn't so big it slows the server's start.
+- **Data files** (`scratchpad.json`, `projects.json` and the rest) are valid JSON.
+- **Away mode** is on or off, and how many requests are waiting.
+- **Server log:** crashes and errors in the last 24 hours.
+
+It only reads; it changes nothing. It exits with 1 when a check fails (warnings don't count), so it works in scripts. `node doctor.js --json` prints the results as JSON.
 
 ## Keep it running (Windows)
 
@@ -136,7 +157,7 @@ If you run `node server.js` yourself while the task is running, the second copy 
 
 On macOS or Linux, `node service.js` prints a launchd / systemd recipe that runs `supervise.js` instead.
 
-## Limits (v0.3)
+## Limits (v0.4)
 
 - **Questions and plan reviews** are answered in the session. Permission requests can be answered on the board with [Away mode](#approve-from-the-board-away-mode).
 - **Away mode is all or nothing.** While it's on, every session's permission requests wait on the board, including the one you're sitting at.

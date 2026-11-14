@@ -20,6 +20,9 @@ const SCRATCH_FILE = path.join(DATA_DIR, 'scratchpad.json');
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
 const CLAUDE_PROJECTS = process.env.CC_CLAUDE_PROJECTS || path.join(os.homedir(), '.claude', 'projects');
 
+const VERSION = readJsonSafe(path.join(__dirname, 'package.json')).version || null;
+const STARTED_AT = Date.now();
+function readJsonSafe(f) { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return {}; } }
 const sessions = new Map();
 let hidden = new Set();
 try { hidden = new Set(JSON.parse(fs.readFileSync(HIDDEN_FILE, 'utf8'))); } catch (_) {}
@@ -947,6 +950,10 @@ const server = http.createServer((req, res) => {
       todos: s.scratch.filter((t) => !t.doneAt).length,
       away: s.away,
     });
+  }
+  // What doctor.js checks: which copy is running, and whether it's up to date.
+  if (url.pathname === '/api/health' && req.method === 'GET') {
+    return json(res, 200, { version: VERSION, pid: process.pid, startedAt: STARTED_AT, dir: __dirname, dataDir: DATA_DIR, away: !!settings.away, holds: holds.size, sessions: sessions.size, transcripts: index.size });
   }
   if (url.pathname === '/api/state') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

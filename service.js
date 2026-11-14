@@ -27,14 +27,21 @@ const FILES = ['server.js', 'supervise.js', 'hook.js', 'package.json', 'public']
 
 const cmd = process.argv[2];
 
+// doctor.js reads these to check the background copy.
+module.exports = { TASK, APP_DIR, FILES, PORT, taskState: () => taskState() };
+// (main() is called at the end, once every helper below is defined.)
+
+function main() {
 if (process.platform !== 'win32') {
   console.log(`Background mode is Windows-only for now.
 On macOS, run supervise.js from a launchd agent (~/Library/LaunchAgents) with RunAtLoad and KeepAlive.
 On Linux, use a systemd user service: ExecStart=${process.execPath} ${path.join(__dirname, 'supervise.js')}, Restart=always.`);
   process.exit(cmd ? 1 : 0);
 }
+run();
+}
 
-const ps = (script) => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true }).trim();
+const ps =(script) => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8', windowsHide: true }).trim();
 const psq = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
 function copyApp() {
@@ -104,6 +111,7 @@ async function status() {
   console.log(`Log:    ${path.join(DATA_DIR, 'server.log')}`);
 }
 
+function run() {
 (async () => {
   switch (cmd) {
     case 'install':
@@ -133,3 +141,5 @@ async function status() {
       process.exit(cmd ? 1 : 0);
   }
 })();
+}
+if (require.main === module) main();
