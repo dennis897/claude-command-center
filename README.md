@@ -38,7 +38,9 @@ Claude Code session ──hook──▶ hook.js ──append──▶ ~/.claude/
 | `PreToolUse` on `AskUserQuestion` / `ExitPlanMode` | Needs you · Question / Plan review |
 | `Stop` | Done (with Claude's last reply as the recap) |
 | `SessionStart` | Done · Ready for a prompt |
-| `SessionEnd` | Removed from the board |
+| `SessionEnd` | Removed from the board, unless its turn finished: then it stays in Done |
+
+**Done stays until you clear it.** A session whose turn finished stays in the Done column until you press **Clear** on its card (or **Clear all**), archive it in the desktop app, or give it a new prompt. That holds when its process ends, after a day of quiet, and across restarts: finished sessions are remembered in `~/.claude/command-center/done.json` (the newest 500). Clear only changes the board's own lists; it never touches the session. A session that was only opened (Ready) still drops off as before.
 
 The server needs no dependencies, only Node 18 or newer.
 
@@ -64,6 +66,45 @@ The panel to the right of the board holds quick to-dos that aren't ready for a s
 - Click an item's text to edit it. Tick its box when it's done.
 - The ▶ button copies a PowerShell command that opens Claude in that project's folder with the to-do as your first prompt.
 - Items are saved in `~/.claude/command-center/scratchpad.json`.
+
+## Usage (tokens and cache)
+
+The **Usage** page shows how many tokens your Claude Code sessions used on this computer, read from the `usage` each reply records in its transcript:
+- **Today** and **last 7 days:** total tokens, input that wasn't cached, output, cache writes, cache reads, and the cache hit rate (cache reads ÷ all input).
+- **Tokens per day** for the last 14 days (hover a bar for its numbers, or show it as a table), and a split **by model**.
+- **Sessions** active in the last 7 days, most recent first, with today's and the week's numbers. A subagent's tokens count toward the session that started it. Click a row for its Focus page.
+
+Each transcript is read from where the last pass stopped, every 30 s; the offsets and running totals are kept in `~/.claude/command-center/usage.json`, so a restart reads only what's new. The first pass reads everything once, in the background (a few minutes for several GB). A reply is written as one line per content block, each repeating the same usage, so each message is counted once. Your plan's usage limits aren't shown: only Anthropic's servers know them, and the board never reads your sign-in token.
+
+## Email (optional)
+
+If something on your machine sorts your mail and writes a small JSON snapshot after each run, the board can show it: an **Email** strip on the Overview and an **Email** page with the Urgent and To-Do lists (grouped by thread, each with **Open in Outlook**), drafts waiting, what you promised (with Overdue / Due tags) and what you're waiting on. Click an email or a draft to see its first lines (its `preview`) without leaving the board. It's "as of the last sort"; a link goes to the sorter's own live page for anything newer. The board only reads the file: it never sends, moves or deletes mail.
+
+Point the board at the file in `~/.claude/command-center/settings.json` (or set `CC_MAIL_SNAPSHOT`), then restart the server:
+
+```json
+{
+  "mailSnapshot": "C:\\path\\to\\portal-email.json",
+  "mailSchedule": { "days": [1, 2, 3, 4, 5], "times": ["08:30", "12:30", "16:30"] }
+}
+```
+
+`mailSchedule` (local time; days 0 = Sunday) is optional: with it the board shows the next run and warns when one was missed (no run within 10 minutes of a run time, 20 minutes after it). The server re-reads the file whenever it changes; write it to a temp file and rename it over the old one so the board never sees half a file. If the file is missing or isn't valid JSON, the Email page says so and the rest of the board carries on. The snapshot's shape:
+
+```json
+{"generatedUtc": "2026-01-05T15:35:10Z", "runStamp": "2026-01-05-1530",
+ "lastRun": {"status": "ok", "windowStartUtc": "…", "windowEndUtc": "…", "finishedUtc": "…",
+             "counts": {"urgent": 1, "todo": 4, "fyi": 12, "noise": 3, "alreadyTagged": 0}, "drafts": 1, "note": ""},
+ "since": "<7 days back>", "counts": {"urgent": 3, "todo": 12, "fyiToday": 40, "noiseToday": 9},
+ "urgent": [{"subject": "…", "from": "Sender", "receivedUtc": "…", "webLink": "https://…", "draftReady": false,
+             "preview": "the first couple of hundred characters of the email"}],
+ "todo": [],
+ "drafts": [{"subject": "…", "to": "Name, Name", "webLink": "https://…", "preview": "…"}],
+ "waiting": {"promised": [{"who": "…", "date": "2026-01-04", "subject": "…", "what": "…", "due": "2026-01-06"}], "others": []},
+ "page": "https://… (the sorter's live page)"}
+```
+
+Only `https://` links are shown, and text is shown as text, never as HTML.
 
 ## Projects (hub)
 
@@ -157,9 +198,10 @@ If you run `node server.js` yourself while the task is running, the second copy 
 
 On macOS or Linux, `node service.js` prints a launchd / systemd recipe that runs `supervise.js` instead.
 
-## Limits (v0.4)
+## Limits (v0.5)
 
 - **Questions and plan reviews** are answered in the session. Permission requests can be answered on the board with [Away mode](#approve-from-the-board-away-mode).
 - **Away mode is all or nothing.** While it's on, every session's permission requests wait on the board, including the one you're sitting at.
 - **Cloud sessions** run their hooks on the remote machine, so they don't show up here.
 - A session whose terminal is killed without a `SessionEnd` event stays on the board and is flagged **stale** after 20 minutes. You can clear it.
+- **Usage** counts only what's in transcripts on this computer: not cloud sessions, other machines, or claude.ai chats.

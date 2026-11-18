@@ -708,6 +708,7 @@ function snapshot() {
     const needsMs = s.needsMs + (s.status === 'needs' ? now - s.statusSince : 0);
     if (s.lastAt >= startOfDay.getTime()) waitedToday += needsMs;
     const hold = [...holds.values()].find((h) => h.sid === s.id);
+    rememberDone(s); // before the checks below, which drop ended and quiet sessions
     if (s.ended || (hidden.has(s.id) && !hold)) continue;
     // A finished turn with background jobs still going is running, as the app shows it.
     const job = s.status === 'done' ? jobs.get(s.id) : null;
@@ -735,8 +736,12 @@ function snapshot() {
       hold: hold ? holdView(hold) : null,
     });
   }
+  addRememberedDone(list);
   lastModel = buildModel(list);
-  return { now, away: !!settings.away, waitedTodayMs: waitedToday, sessions: list, projects: lastModel.projects, history: lastModel.history, scratch };
+  return {
+    now, away: !!settings.away, waitedTodayMs: waitedToday, sessions: list, projects: lastModel.projects, history: lastModel.history, scratch,
+    mail: mailView(), usage: usageForBoard(list),
+  };
 }
 
 // ---------- approvals from the board (Away mode) ----------
@@ -817,6 +822,304 @@ function decideHold(res, id, body) {
 
 function holdView(h) {
   return { id: h.id, tool: h.tool, text: h.text, always: h.rules.length ? h.rulesLabel : null, createdAt: h.createdAt, expiresAt: h.expiresAt };
+}
+
+// ---------- Done stays until you clear it ----------
+// A finished session used to drop off Done when its process ended, after 24 h of
+// quiet, or after a restart once its events were older than 48 h. Now each finished
+// session is remembered in done.json and stays on the board until you press Clear
+// (or Clear all), archive it in the desktop app, or give it a new prompt.
+const DONE_FILE = path.join(DATA_DIR, 'done.json');
+const DONE_MAX = 500; // a safety cap; the oldest go first
+let doneMem = readJson(DONE_FILE, {});
+if (!doneMem || typeof doneMem !== 'object' || Array.isArray(doneMem)) doneMem = {};
+let doneTimer = null;
+function saveDoneSoon() {
+  if (doneTimer) return;
+  doneTimer = setTimeout(() => {
+    doneTimer = null;
+    const ids = Object.keys(doneMem);
+    if (ids.length > DONE_MAX) ids.sort((a, b) => doneMem[a].statusSince - doneMem[b].statusSince).slice(0, ids.length - DONE_MAX).forEach((id) => delete doneMem[id]);
+    try { writeJson(DONE_FILE, doneMem); } catch (_) {}
+  }, 1500);
+}
+function forgetDone(id) { if (doneMem[id]) { delete doneMem[id]; saveDoneSoon(); } }
+function rememberDone(s) {
+  if (s.status !== 'done' || s.kind !== 'Finished' || hidden.has(s.id)) return;
+  const dk = desktopByCli.get(s.id);
+  if (dk && dk.archived) return;
+  const ix = index.get(s.id) || {};
+  const title = (dk && dk.title) || ix.customTitle || ix.aiTitle || s.title || s.project;
+  const old = doneMem[s.id];
+  if (old && old.statusSince === s.statusSince && old.title === title && old.recap === (s.recap || null)) return;
+  const root = s.cwd ? resolveRepo(s.cwd).root : null;
+  const rk = projectKey(root);
+  doneMem[s.id] = {
+    id: s.id, title, cwd: s.cwd, projectKey: rk, project: (projectMeta[rk] || {}).name || (root ? displayName(root) : s.project),
+    branch: gitBranch(s.cwd), host: s.host, model: s.model, recap: s.recap || null, lastPrompt: s.lastPrompt || null,
+    startedAt: s.startedAt, lastAt: s.lastAt, statusSince: s.statusSince, desktopId: dk ? dk.localId : null,
+    tools: s.tools, errors: s.errors, files: [...s.files].slice(-12), fileCount: s.files.size,
+  };
+  saveDoneSoon();
+}
+// Finished sessions that are no longer live (ended, quiet, or from before a restart).
+function addRememberedDone(list) {
+  const shown = new Set(list.map((x) => x.id));
+  for (const r of Object.values(doneMem)) {
+    if (!r || !r.id || shown.has(r.id)) continue;
+    if (hidden.has(r.id)) { forgetDone(r.id); continue; }
+    const dk = desktopByCli.get(r.id);
+    if (dk && dk.archived) { forgetDone(r.id); continue; } // you archived it in the app
+    const ix = index.get(r.id) || {};
+    list.push({
+      ...r, title: (dk && dk.title) || ix.customTitle || ix.aiTitle || r.title, desktopId: dk ? dk.localId : r.desktopId,
+      files: r.files || [], status: 'done', kind: 'Finished', detail: null, now: null, background: 0, turnStartedAt: null,
+      stale: false, events: [], hold: null, kept: true,
+    });
+  }
+}
+
+// ---------- email snapshot (optional) ----------
+// An email triage job can write a small JSON snapshot of the inbox: what's urgent,
+// what's to do, drafts waiting, and what you're waiting on. Set "mailSnapshot" in
+// settings.json (or CC_MAIL_SNAPSHOT) to its path and the board shows it, re-reading
+// it whenever the file changes. The board only reads it: it never sends, moves or
+// deletes mail, and its links simply open the message in Outlook on the web.
+// "mailSchedule": {"days":[1,2,3,4,5],"times":["06:30","08:30"]} (local time) lets the
+// board show the next run and warn when one was missed.
+let mail = { file: null, ok: false, error: null, data: null, mtime: 0, size: -1, fails: 0 };
+let mailRetry = null;
+const mailFile = () => (typeof settings.mailSnapshot === 'string' && settings.mailSnapshot) || process.env.CC_MAIL_SNAPSHOT || null;
+const httpsUrl = (v) => (typeof v === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(v) ? v.slice(0, 2000) : null);
+const isoTime = (v) => { const t = typeof v === 'string' ? Date.parse(v) : NaN; return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+const count = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0);
+const ymd = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+function cleanMail(j) {
+  const s = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
+  const list = (a, f, n) => (Array.isArray(a) ? a.filter((x) => x && typeof x === 'object').slice(0, n).map(f) : []);
+  // A preview is the first lines of the email, as the sorter's search returned them; shown as text only.
+  const preview = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, 600) : '');
+  const msg = (m) => ({ subject: s(m.subject, 300) || '(no subject)', from: s(m.from, 160), receivedUtc: isoTime(m.receivedUtc), webLink: httpsUrl(m.webLink), draftReady: m.draftReady === true, preview: preview(m.preview) });
+  const item = (x) => ({ id: s(x.id, 120), who: s(x.who, 200), date: ymd(x.date), subject: s(x.subject, 300), what: s(x.what, 600), due: ymd(x.due) });
+  const lr = j.lastRun && typeof j.lastRun === 'object' ? j.lastRun : null;
+  const lc = (lr && lr.counts) || {};
+  const c = j.counts || {};
+  const w = j.waiting && typeof j.waiting === 'object' ? j.waiting : {};
+  return {
+    generatedUtc: isoTime(j.generatedUtc), runStamp: s(j.runStamp, 40) || null,
+    lastRun: lr && {
+      status: s(lr.status, 20) || 'unknown', mode: s(lr.mode, 10) || null, stamp: s(lr.stamp, 40) || null,
+      windowStartUtc: isoTime(lr.windowStartUtc), windowEndUtc: isoTime(lr.windowEndUtc), finishedUtc: isoTime(lr.finishedUtc),
+      counts: { urgent: count(lc.urgent), todo: count(lc.todo), fyi: count(lc.fyi), noise: count(lc.noise), alreadyTagged: count(lc.alreadyTagged) },
+      drafts: count(lr.drafts), note: s(lr.note, 300), why: s(lr.why, 300),
+    },
+    since: isoTime(j.since), todayStartUtc: isoTime(j.todayStartUtc),
+    counts: { urgent: count(c.urgent), todo: count(c.todo), fyiToday: count(c.fyiToday), noiseToday: count(c.noiseToday) },
+    urgent: list(j.urgent, msg, 300), todo: list(j.todo, msg, 500),
+    drafts: list(j.drafts, (d) => ({ subject: s(d.subject, 300) || '(no subject)', to: s(d.to, 300), webLink: httpsUrl(d.webLink), preview: preview(d.preview) }), 100),
+    waiting: { promised: list(w.promised, item, 80), others: list(w.others, item, 80), refreshed: s(w.refreshed, 40) || null, updatedUtc: isoTime(w.updatedUtc) },
+    page: httpsUrl(j.page),
+  };
+}
+function loadMail() {
+  const file = mailFile();
+  if (!file) return;
+  let st;
+  try { st = fs.statSync(file); } catch (_) { return mailFailed(file, 'missing'); }
+  if (mail.ok && mail.file === file && mail.mtime === st.mtimeMs && mail.size === st.size) return;
+  let data;
+  try {
+    const j = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+    if (!j || typeof j !== 'object' || Array.isArray(j)) throw new Error('not an object');
+    data = cleanMail(j);
+  } catch (_) { return mailFailed(file, 'unreadable'); }
+  mail = { file, ok: true, error: null, data, mtime: st.mtimeMs, size: st.size, fails: 0, readAt: Date.now() };
+  push();
+}
+function mailFailed(file, why) {
+  // Replacing the file by rename can leave a moment with no file: retry once first.
+  if (++mail.fails < 2) { clearTimeout(mailRetry); mailRetry = setTimeout(loadMail, 1500); return; }
+  const changed = mail.ok || mail.error !== why;
+  mail = { ...mail, file, ok: false, error: why, mtime: 0, size: -1 };
+  if (changed) push();
+}
+function mailSchedule() {
+  const m = settings.mailSchedule;
+  if (!m || typeof m !== 'object') return null;
+  const days = Array.isArray(m.days) ? m.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : [];
+  const times = Array.isArray(m.times) ? m.times.filter((t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t)) : [];
+  return days.length && times.length ? { days, times: times.sort() } : null;
+}
+function mailView() {
+  if (!mailFile()) return null;
+  return { file: mail.file || mailFile(), ok: mail.ok, error: mail.error, data: mail.data, readAt: mail.readAt || null, schedule: mailSchedule() };
+}
+
+// ---------- token and cache usage ----------
+// Every assistant message in a transcript records its token usage. Each transcript
+// (and each subagent transcript under <session>/subagents/) is read from where the
+// last pass stopped; the offsets and the running totals per file, day and model live
+// in usage.json, so a restart reads only what is new, never a whole 65 MB file again.
+// A message is written as one line per content block, each repeating the same usage,
+// so a repeated message id only adds what it adds over the earlier line.
+const USAGE_FILE = path.join(DATA_DIR, 'usage.json');
+let usage = readJson(USAGE_FILE, null);
+if (!usage || usage.v !== 1 || !usage.files || typeof usage.files !== 'object') usage = { v: 1, files: {} };
+let usageScanning = false, usageReady = Object.keys(usage.files).length > 0, usageSummary = null;
+const dayKey = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+function usageObject(line) {
+  const i = line.lastIndexOf('"usage":{'); // message.usage comes after the content
+  if (i < 0) return null;
+  let depth = 0, j = i + 8;
+  for (; j < line.length; j++) { const c = line[j]; if (c === '{') depth++; else if (c === '}' && --depth === 0) break; }
+  try { return JSON.parse(line.slice(i + 8, j + 1)); } catch (_) { return null; }
+}
+function usageLine(f, line) {
+  if (!line.includes('"type":"assistant"') || !line.includes('"usage":{')) return false;
+  const u = usageObject(line);
+  if (!u) return false;
+  const vals = [u.input_tokens, u.output_tokens, u.cache_creation_input_tokens, u.cache_read_input_tokens].map((x) => (Number.isFinite(x) && x > 0 ? x : 0));
+  if (!vals.some(Boolean)) return false;
+  const m0 = line.indexOf('"message":{');
+  const head = m0 >= 0 ? line.slice(m0, m0 + 600) : '';
+  const mm = /"model":"([^"]{1,80})"/.exec(head);
+  const model = mm ? mm[1] : 'unknown';
+  if (model === '<synthetic>') return false;
+  const ts = Date.parse(tailField(line, 'timestamp') || '');
+  if (!Number.isFinite(ts)) return false;
+  const im = /"id":"(msg_[A-Za-z0-9_-]{1,80})"/.exec(head);
+  let add = vals, isNew = true;
+  if (im) {
+    const prev = f.ids.find((x) => x[0] === im[1]);
+    if (prev) {
+      isNew = false;
+      add = vals.map((v, k) => Math.max(0, v - prev[k + 1]));
+      for (let k = 0; k < 4; k++) prev[k + 1] = Math.max(prev[k + 1], vals[k]);
+    } else {
+      f.ids.push([im[1], ...vals]);
+      if (f.ids.length > 8) f.ids.shift();
+    }
+  }
+  if (!isNew && !add.some(Boolean)) return false;
+  const key = dayKey(ts) + '|' + model;
+  const row = f.d[key] || (f.d[key] = [0, 0, 0, 0, 0]);
+  for (let k = 0; k < 4; k++) row[k] += add[k];
+  if (isNew) row[4]++;
+  if (ts > (f.t || 0)) f.t = ts;
+  return true;
+}
+async function usageFiles() {
+  const out = [];
+  let dirs = [];
+  try { dirs = await fs.promises.readdir(CLAUDE_PROJECTS, { withFileTypes: true }); } catch (_) { return out; }
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue;
+    const dir = path.join(CLAUDE_PROJECTS, d.name);
+    let ents = [];
+    try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch (_) { continue; }
+    for (const e of ents) {
+      if (e.isFile() && e.name.endsWith('.jsonl')) out.push({ file: path.join(dir, e.name), sid: e.name.slice(0, -6) });
+      else if (e.isDirectory()) {
+        const sub = path.join(dir, e.name, 'subagents');
+        let names = [];
+        try { names = await fs.promises.readdir(sub); } catch (_) { continue; }
+        for (const n of names) if (n.endsWith('.jsonl')) out.push({ file: path.join(sub, n), sid: e.name });
+      }
+    }
+  }
+  return out;
+}
+async function scanUsage() {
+  if (usageScanning) return;
+  usageScanning = true;
+  let changed = false;
+  try {
+    for (const { file, sid } of await usageFiles()) {
+      let st;
+      try { st = await fs.promises.stat(file); } catch (_) { continue; }
+      let f = usage.files[file];
+      if (!f || st.size < f.o) { f = usage.files[file] = { o: 0, sid, d: {}, ids: [], t: 0 }; changed = true; }
+      if (!f.d || !Array.isArray(f.ids)) { f.d = f.d || {}; f.ids = []; }
+      if (st.size === f.o) continue;
+      let fh;
+      try {
+        fh = await fs.promises.open(file, 'r');
+        let pos = f.o, rest = null;
+        while (pos < st.size) {
+          const len = Math.min(4 << 20, st.size - pos);
+          const { bytesRead, buffer } = await fh.read(Buffer.alloc(len), 0, len, pos);
+          if (!bytesRead) break;
+          pos += bytesRead;
+          const buf = rest ? Buffer.concat([rest, buffer.subarray(0, bytesRead)]) : buffer.subarray(0, bytesRead);
+          const nl = buf.lastIndexOf(10);
+          if (nl < 0) { // no line end yet: keep the bytes, unless one line is absurdly long
+            if (buf.length > (64 << 20)) { rest = null; f.o = pos; } else rest = buf;
+            continue;
+          }
+          for (const l of buf.toString('utf8', 0, nl).split('\n')) if (l && usageLine(f, l)) changed = true;
+          rest = nl + 1 < buf.length ? buf.subarray(nl + 1) : null;
+          f.o = pos - (rest ? rest.length : 0); // only whole lines are counted as read
+        }
+      } catch (_) {
+      } finally { if (fh) await fh.close().catch(() => {}); }
+    }
+  } catch (e) { console.error('usage scan:', (e && e.message) || e); }
+  usageScanning = false;
+  if (changed || !usageReady) {
+    usageReady = true;
+    usageSummary = null;
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(USAGE_FILE + '.tmp', JSON.stringify(usage)); fs.renameSync(USAGE_FILE + '.tmp', USAGE_FILE); } catch (_) {}
+    push();
+  }
+}
+const sum5 = () => [0, 0, 0, 0, 0];
+const addInto = (a, b) => { for (let k = 0; k < 5; k++) a[k] += b[k] || 0; return a; };
+const tok = (a) => ({ input: a[0], output: a[1], cacheWrite: a[2], cacheRead: a[3], messages: a[4] });
+function buildUsageSummary() {
+  const now = Date.now();
+  const today = dayKey(now);
+  const from14 = dayKey(now - 13 * 86400e3), from7 = dayKey(now - 6 * 86400e3);
+  const days = new Map(), models = new Map(), byS = new Map();
+  for (const f of Object.values(usage.files)) {
+    for (const [key, v] of Object.entries(f.d || {})) {
+      const bar = key.indexOf('|');
+      const day = key.slice(0, bar), model = key.slice(bar + 1);
+      if (day >= from14) addInto(days.get(day) || (days.set(day, sum5()), days.get(day)), v);
+      if (day < from7) continue;
+      addInto(models.get(model) || (models.set(model, sum5()), models.get(model)), v);
+      let s = byS.get(f.sid);
+      if (!s) { s = { id: f.sid, t: 0, week: sum5(), today: sum5(), models: new Set() }; byS.set(f.sid, s); }
+      addInto(s.week, v);
+      if (day === today) addInto(s.today, v);
+      s.models.add(model);
+    }
+    const s = byS.get(f.sid);
+    if (s && f.t > s.t) s.t = f.t;
+  }
+  const dayList = [];
+  for (let i = 13; i >= 0; i--) { const d = dayKey(now - i * 86400e3); dayList.push({ date: d, ...tok(days.get(d) || sum5()) }); }
+  const week = dayList.slice(-7).reduce((a, d) => addInto(a, [d.input, d.output, d.cacheWrite, d.cacheRead, d.messages]), sum5());
+  return {
+    today: tok(days.get(today) || sum5()), week: tok(week), days: dayList,
+    models: [...models].map(([model, v]) => ({ model, ...tok(v) })).sort((a, b) => (b.input + b.output + b.cacheWrite + b.cacheRead) - (a.input + a.output + a.cacheWrite + a.cacheRead)),
+    sessions: [...byS.values()].sort((a, b) => b.t - a.t).slice(0, 40).map((s) => ({ id: s.id, lastAt: s.t, week: tok(s.week), today: tok(s.today), models: [...s.models] })),
+    files: Object.keys(usage.files).length,
+  };
+}
+function usageForBoard(list) {
+  if (!usageReady) return { ready: false };
+  if (!usageSummary || usageSummary.day !== dayKey(Date.now())) usageSummary = { day: dayKey(Date.now()), v: buildUsageSummary() };
+  const v = usageSummary.v;
+  const live = new Map(list.map((s) => [s.id, s]));
+  const sessionsOut = v.sessions.map((s) => {
+    const dk = desktopByCli.get(s.id), ix = index.get(s.id) || {}, l = live.get(s.id);
+    const cwd = ix.cwd || (l && l.cwd) || null;
+    const root = cwd ? resolveRepo(cwd).root : null;
+    return { ...s, title: (dk && dk.title) || ix.customTitle || ix.aiTitle || (l && l.title) || firstLine(ix.firstPrompt, 90) || 'Untitled session',
+      project: root ? ((projectMeta[projectKey(root)] || {}).name || displayName(root)) : null, status: l ? l.status : null };
+  });
+  return { ready: true, scanning: usageScanning, ...v, sessions: sessionsOut };
 }
 
 // ---------- http ----------
@@ -977,6 +1280,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/settings' && req.method === 'POST') {
     return readBody(req).then((body) => {
       if ('away' in body) settings.away = !!body.away;
+      // Keep keys added to the file by hand since the server started (e.g. mailSnapshot).
+      settings = { ...readJson(SETTINGS_FILE, {}), away: settings.away };
       writeJson(SETTINGS_FILE, settings);
       if (!settings.away) for (const h of [...holds.values()]) endHold(h, null);
       push();
@@ -1011,12 +1316,16 @@ const server = http.createServer((req, res) => {
   }
   const m = /^\/api\/sessions\/([\w-]+)\/(hide|unhide)$/.exec(url.pathname);
   if (m && req.method === 'POST') {
-    if (m[2] === 'hide') hidden.add(m[1]); else hidden.delete(m[1]);
+    if (m[2] === 'hide') { hidden.add(m[1]); forgetDone(m[1]); } else hidden.delete(m[1]);
     saveHidden(); push();
     res.writeHead(204); return res.end();
   }
+  // Clear all: every Done card, including the remembered ones (only this board's own
+  // lists change; nothing is sent to the sessions).
   if (url.pathname === '/api/hide-done' && req.method === 'POST') {
     for (const s of sessions.values()) if (s.status === 'done') hidden.add(s.id);
+    for (const id of Object.keys(doneMem)) hidden.add(id);
+    doneMem = {}; saveDoneSoon();
     saveHidden(); push();
     res.writeHead(204); return res.end();
   }
@@ -1024,7 +1333,8 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    // no-store: after an update the browser loads the new board, not a cached copy.
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(buf);
   });
 });
@@ -1043,6 +1353,15 @@ readNew(false);
 for (const s of sessions.values()) if (s.status === 'done' && s.transcript && !s.recap && s.kind === 'Finished') s.recap = lastAssistantText(s.transcript);
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.watchFile(EVENTS, { interval: 400 }, () => { if (readNew(true)) push(); });
+// Email snapshot: read now, then again whenever the file changes.
+if (mailFile()) {
+  loadMail();
+  fs.watchFile(mailFile(), { interval: 2000 }, () => { mail.fails = 0; loadMail(); });
+}
+// Token usage: a first pass soon after start (only new bytes if usage.json exists),
+// then every 30 s.
+setTimeout(scanUsage, 3000);
+setInterval(scanUsage, 30e3);
 setInterval(push, 15e3); // refresh timers and stale flags
 setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25e3);
 

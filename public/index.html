@@ -264,6 +264,66 @@ aside.drawer.open{transform:none}
 .filterbar .ptag{font-size:13px;padding:3px 10px 3px 8px}
 .filterbar .fx{color:var(--muted);font-size:13px;flex:1}
 .empty .linkbtn{color:var(--blue-t);font-size:13px;padding:2px 0;text-decoration:underline}
+/* email (from the triage job's snapshot) */
+a.btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-space:nowrap}
+.mailbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:12px 16px}
+.mailbar .mt{font:600 15px var(--head);display:flex;align-items:center;gap:8px}
+.mailbar .asof{color:var(--dim);font-size:12px}
+.mchip{border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.m-urg{background:#3A1C1C;color:#FFB0B0}.m-todo{background:var(--amber-chip);color:var(--amber-t)}.m-fyi{background:var(--teal-chip);color:var(--teal)}
+.m-noise{background:#1E2330;color:#AEB7C9}.m-draft{background:#262040;color:#D4C8FF}.m-wait{background:var(--blue-chip);color:var(--blue-t)}
+.mwarn{background:#2A1E1E;border:1px solid #5A2E2E;color:#FFD0D0;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.45}
+.mwarn b{color:#FFB0B0}
+.mnote{background:#17140D;border:1px solid #4A3A1C;color:#E9DCC2;border-radius:12px;padding:10px 14px;font-size:13px}
+.mtiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.mtile{background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.mtile b{font:600 26px/1.1 var(--head)}
+.mtile span{font-size:12px;color:var(--muted)}
+.mcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px;align-items:start}
+.mlist{background:#0F131C;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.mrow{display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid #171D29}
+.mrow:last-child{border-bottom:0}
+.mrow .ms{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.mrow .sj{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.mrow .mf{font-size:12px;color:var(--dim);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.mrow .btn{height:30px;font-size:12px}
+.mthread{border-bottom:1px solid #171D29}.mthread:last-child{border-bottom:0}
+.mthread .mrow{border-bottom:0}
+.mthread details{padding:0 14px 8px 14px}
+.mthread summary{cursor:pointer;color:var(--dim);font-size:12px;list-style:none;padding:0 0 2px}
+.mthread summary::-webkit-details-marker{display:none}
+.mthread .older{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--soft);padding:4px 0 4px 12px;border-left:2px solid #232B3B}
+.mthread .older span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+[data-mprev]{cursor:pointer;outline:none}
+[data-mprev]:focus-visible{box-shadow:0 0 0 2px #3A4A66;border-radius:6px}
+.mrow .ms[data-mprev]:hover .sj{text-decoration:underline;text-decoration-color:#3A4A66}
+.car{display:inline-block;width:14px;color:var(--dim);font-size:11px;transition:transform .12s}
+[aria-expanded=true] .car{transform:rotate(90deg)}
+.mprev{margin:0 14px 12px 14px;padding:10px 12px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;color:var(--soft);font-size:13px;line-height:1.55;word-break:break-word}
+.older + .mprev{margin:2px 0 8px 12px}
+.mprev .mpn{display:block;margin-top:6px;color:var(--dim);font-size:11.5px}
+.wl{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-bottom:1px solid #171D29;font-size:13px;line-height:1.45}
+.wl:last-child{border-bottom:0}
+.wl .ww{flex:1;min-width:0}
+.wl .wh{font-weight:600}
+.wl .wsub{color:var(--dim);font-size:12px}
+/* usage */
+.utiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.uchart{position:relative;background:#0F131C;border:1px solid var(--line);border-radius:14px;padding:16px 16px 8px}
+.ubars{display:flex;align-items:flex-end;gap:2px;height:150px;border-bottom:1px solid #2A3448}
+.ub{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;outline:none;cursor:default}
+.ub i{display:block;background:var(--blue);border-radius:4px 4px 0 0;min-height:1px}
+.ub:hover i,.ub:focus-visible i{background:var(--blue-t)}
+.ub.today i{background:var(--amber)}
+.uxl{display:flex;gap:2px;margin-top:6px}
+.uxl span{flex:1;min-width:0;text-align:center;font:11px var(--mono);color:var(--dim);white-space:nowrap;overflow:hidden}
+.utip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;white-space:nowrap;transform:translate(-50%,-100%);z-index:2}
+.utbl{width:100%;border-collapse:collapse;font-size:13px}
+.utbl th{color:var(--dim);font-weight:500;font-size:12px;text-align:right;padding:9px 12px;border-bottom:1px solid #1C2230;white-space:nowrap}
+.utbl th:first-child,.utbl td:first-child{text-align:left}
+.utbl td{padding:9px 12px;border-bottom:1px solid #151A24;text-align:right;font:12px var(--mono);color:var(--soft);white-space:nowrap}
+.utbl td:first-child{font:13px Inter,sans-serif;color:var(--text);white-space:normal;min-width:220px}
+.utbl tr.click{cursor:pointer}.utbl tr.click:hover td{background:#131926}
 @media (max-width:720px){main{padding:20px 16px}.rail{position:static;max-width:none}nav.side{max-width:none;border-right:0;border-bottom:1px solid var(--line)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -279,6 +339,8 @@ aside.drawer.open{transform:none}
       <a href="#overview" data-view="overview">Overview <span id="nav-sessions">0</span></a>
       <a href="#projects" data-view="projects">Projects <span id="nav-projects">0</span></a>
       <a href="#sessions" data-view="sessions">Sessions <span id="nav-history">0</span></a>
+      <a href="#email" data-view="email" id="nav-email-link" hidden>Email <span id="nav-email">–</span></a>
+      <a href="#usage" data-view="usage">Usage <span id="nav-usage">–</span></a>
     </div>
     <div>
       <div class="sec-h">Active projects</div>
@@ -319,6 +381,7 @@ aside.drawer.open{transform:none}
       <div class="stat s-wait"><div class="lb">Waited on you today</div><div class="n" id="n-wait">0m</div><div class="ft">time sessions sat blocked on you</div></div>
     </section>
 
+    <section class="mailbar" id="mailbar" aria-label="Email" hidden></section>
     <div class="awaybar" id="awaybar" hidden><b>Away mode is on.</b><span style="flex:1">Permission requests wait on this board. Sessions won't show their own dialog until you answer here or hand the request back.</span><button class="btn" type="button" id="away-off">Turn off</button></div>
     <div class="filterbar" id="filterbar" hidden></div>
     <div class="work">
@@ -406,6 +469,27 @@ aside.drawer.open{transform:none}
     </div>
     <div class="bulk" id="sbulk" hidden></div>
     <div class="tbl"><div class="in" id="stable"></div></div>
+   </div>
+
+   <div id="view-email" hidden style="display:flex;flex-direction:column;gap:20px">
+    <header class="top">
+      <div class="hi">
+        <h1>Email</h1>
+        <p class="sub" id="email-sub">As of the last sort</p>
+      </div>
+      <span id="email-live"></span>
+    </header>
+    <div id="email-body" style="display:flex;flex-direction:column;gap:20px"></div>
+   </div>
+
+   <div id="view-usage" hidden style="display:flex;flex-direction:column;gap:20px">
+    <header class="top">
+      <div class="hi">
+        <h1>Usage</h1>
+        <p class="sub">Tokens your Claude Code sessions used on this computer, read from their transcripts every 30 seconds.</p>
+      </div>
+    </header>
+    <div id="usage-body" style="display:flex;flex-direction:column;gap:20px"></div>
    </div>
   </main>
 </div>
@@ -566,6 +650,10 @@ function render() {
 
   $('nav-history').textContent = (state.history || []).filter((h) => !h.archived).length;
   renderScratch();
+  renderMailbar();
+  renderUsageNav();
+  if (view === 'email') renderEmail();
+  if (view === 'usage') renderUsage();
   if (view === 'projects') renderHub();
   if (view === 'sessions') renderSessions();
   if (view === 'focus') renderFocus();
@@ -1132,11 +1220,247 @@ function renderProjectDrawer() {
     ${sess.length ? `<div><div class="sec-h" style="padding:0;margin-bottom:6px">Sessions on the board</div>${sess.map((s) => `<div class="ev" style="cursor:pointer" data-open="${esc(s.id)}"><span class="k" style="color:${s.status === 'needs' ? 'var(--amber-t)' : s.status === 'running' ? 'var(--blue-t)' : 'var(--teal)'}">${s.status === 'needs' ? 'Needs you' : s.status === 'running' ? 'Running' : 'Done'}</span><span class="x" style="font-family:Inter,sans-serif">${esc(s.title)}</span></div>`).join('')}</div>` : ''}`;
 }
 
+// ---------- email ----------
+// From the snapshot an email triage job writes after each run (see the README). It
+// is as of that run; the triage job's own page has newer mail. The board only reads
+// it: every button here just opens a link.
+const openThreads = new Set();
+const normSubj = (s) => { let t = String(s || '').trim(); let p; do { p = t; t = t.replace(/^(re|fw|fwd|aw|tr)\s*:\s*/i, ''); } while (t !== p); return t.replace(/\s+/g, ' ').toLowerCase(); };
+const localDay = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function when(ms) {
+  if (!ms) return '';
+  const d = new Date(ms), t = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (localDay(ms) === localDay(now())) return t;
+  if (localDay(ms) === localDay(now() - 86400e3)) return 'Yesterday ' + t;
+  return d.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' }) + ' ' + t;
+}
+// The sorter's run times: the latest that has passed and the next to come (local time).
+function sortSlots(sched, t) {
+  if (!sched) return {};
+  let latest = null, next = null;
+  for (let i = -8; i <= 8; i++) {
+    const d = new Date(t); d.setDate(d.getDate() + i);
+    if (!sched.days.includes(d.getDay())) continue;
+    for (const hhmm of sched.times) {
+      const [h, m] = hhmm.split(':').map(Number);
+      const x = new Date(d); x.setHours(h, m, 0, 0);
+      const ms = x.getTime();
+      if (ms <= t) { if (!latest || ms > latest) latest = ms; } else if (!next || ms < next) next = ms;
+    }
+  }
+  return { latest, next };
+}
+function mailState() {
+  const m = state.mail;
+  if (!m) return null;
+  const d = m.data, lr = d && d.lastRun;
+  const { latest, next } = sortSlots(m.schedule, now());
+  const lastEnd = lr && lr.windowEndUtc ? Date.parse(lr.windowEndUtc) : 0;
+  // Missed: the latest run time is 20 minutes gone and no run started near it.
+  const missed = !!(latest && now() - latest >= 20 * 60e3 && (!lastEnd || lastEnd < latest - 10 * 60e3));
+  const asOf = d && d.generatedUtc ? Date.parse(d.generatedUtc) : 0;
+  const sortedAt = lr ? Date.parse(lr.finishedUtc || lr.windowEndUtc) || 0 : 0; // when the last sort finished
+  return { m, d, lr, latest, next, lastEnd, missed, asOf, sortedAt, stopped: !!(lr && lr.status !== 'ok') };
+}
+function mailWarnings(ms, full) {
+  const out = [];
+  if (!ms.m.ok) out.push(ms.m.error === 'missing'
+    ? `<b>No email snapshot yet.</b> The board looks for it at <code>${esc(ms.m.file)}</code>; the triage job writes it after each run.`
+    : `<b>The email snapshot can't be read.</b> ${esc(ms.m.file)} isn't valid JSON. The next run rewrites it.`);
+  if (ms.missed) out.push(`<b>A sort was missed.</b> The ${esc(when(ms.latest))} run hasn't happened${ms.lastEnd ? `; the last one ran at ${esc(when(ms.lastEnd))}` : ''}. Runs need the Claude app open; a missed one runs when it's next opened.`);
+  if (ms.stopped) out.push(`<b>The last run stopped.</b> ${esc(ms.lr.why || ms.lr.note || 'See its run report.')}`);
+  if (full && ms.lr && ms.lr.note && !ms.stopped) return { warn: out, note: ms.lr.note };
+  return { warn: out, note: null };
+}
+function liveLink(d, label) {
+  return d && d.page ? `<a class="btn" href="${esc(d.page)}" target="_blank" rel="noopener noreferrer">${esc(label || 'Open the live Email Triage page')} ↗</a>` : '';
+}
+function renderMailbar() {
+  const ms = mailState();
+  $('nav-email-link').hidden = !ms;
+  $('mailbar').hidden = !ms;
+  if (!ms) return;
+  const d = ms.d;
+  $('nav-email').textContent = d ? d.counts.urgent + d.counts.todo : '!';
+  const warn = !ms.m.ok || ms.missed || ms.stopped;
+  $('mailbar').innerHTML = `
+    <span class="mt"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email</span>
+    ${d ? `<span class="asof">as of the last sort${ms.sortedAt ? ', ' + esc(when(ms.sortedAt)) : ''}</span>
+    <span class="mchip m-urg">${d.counts.urgent} Urgent</span><span class="mchip m-todo">${d.counts.todo} To-Do</span>
+    <span class="mchip m-draft">${d.drafts.length} draft${d.drafts.length === 1 ? '' : 's'} waiting</span>
+    <span class="mchip m-wait">${d.waiting.promised.length} you promised</span>` : ''}
+    ${warn ? `<span class="mchip" style="background:#3A1C1C;color:#FFB0B0">${!ms.m.ok ? 'No snapshot' : ms.missed ? 'Sort missed' : 'Last sort stopped'}</span>` : ''}
+    ${ms.next ? `<span class="asof">next sort ${esc(when(ms.next))}</span>` : ''}
+    <span style="flex:1"></span>
+    <a class="btn" href="#email">Open Email</a>${liveLink(d, 'Live page')}`;
+}
+function threadRows(list, kind) {
+  const groups = new Map();
+  for (const m of list) {
+    const k = normSubj(m.subject);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(m);
+  }
+  if (!groups.size) return `<div class="empty" style="border:0">Nothing tagged ${kind} in the last 7 days</div>`;
+  return [...groups.entries()].map(([k, ms]) => {
+    const top = ms[0];
+    const key = kind + ':' + k;
+    const ready = ms.some((x) => x.draftReady);
+    const openBtn = (m) => (m.webLink ? `<a class="btn" href="${esc(m.webLink)}" target="_blank" rel="noopener noreferrer">Open in Outlook</a>` : '');
+    const tk = prevKey(top);
+    return `<div class="mthread">
+      <div class="mrow"><div class="ms" data-mprev="${esc(tk)}" role="button" tabindex="0" aria-expanded="${openPreviews.has(tk)}" title="Click for a preview"><div class="sj"><span class="car" aria-hidden="true">▸</span>${esc(top.subject)}</div>
+        <div class="mf"><span>${esc(top.from)}</span><span>${esc(when(Date.parse(top.receivedUtc)))}</span>${ms.length > 1 ? `<span>${ms.length} messages</span>` : ''}${ready ? '<span class="mchip m-draft">Draft ready</span>' : ''}</div></div>
+        ${openBtn(top)}</div>
+      ${previewBox(top, MAIL_PREVIEW_NOTE)}
+      ${ms.length > 1 ? `<details data-thread="${esc(key)}"${openThreads.has(key) ? ' open' : ''}><summary>Show ${ms.length - 1} earlier</summary>
+        ${ms.slice(1).map((m) => `<div class="older" data-mprev="${esc(prevKey(m))}" role="button" tabindex="0" aria-expanded="${openPreviews.has(prevKey(m))}" title="Click for a preview"><span><span class="car" aria-hidden="true">▸</span>${esc(m.from)} · ${esc(when(Date.parse(m.receivedUtc)))}</span>${m.webLink ? `<a href="${esc(m.webLink)}" target="_blank" rel="noopener noreferrer">Open</a>` : ''}</div>${previewBox(m, MAIL_PREVIEW_NOTE)}`).join('')}</details>` : ''}
+    </div>`;
+  }).join('');
+}
+// Click an email (or a draft) for its first lines; Open in Outlook has the rest.
+const openPreviews = new Set();
+const MAIL_PREVIEW_NOTE = "The first lines of the email, as of the last sort. Open in Outlook for all of it.";
+const prevKey = (m) => m.webLink || m.subject + '|' + (m.receivedUtc || '');
+function previewBox(m, note) {
+  if (!openPreviews.has(prevKey(m))) return '';
+  return `<div class="mprev">${m.preview ? esc(m.preview) : '<i>No preview for this one.</i>'}<span class="mpn">${esc(note)}</span></div>`;
+}
+function togglePreview(key) {
+  if (openPreviews.has(key)) openPreviews.delete(key); else openPreviews.add(key);
+  renderEmail();
+  const el = [...document.querySelectorAll('[data-mprev]')].find((e) => e.dataset.mprev === key);
+  if (el) el.focus({ preventScroll: true });
+}
+function dueTag(due) {
+  if (!due) return '';
+  const today = localDay(now());
+  if (due < today) return '<span class="mchip m-urg">Overdue</span>';
+  if (due === today) return '<span class="mchip m-todo">Due today</span>';
+  const dd = new Date(due + 'T12:00:00');
+  return `<span class="mchip m-noise">Due ${esc(dd.toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' }))}</span>`;
+}
+function waitRows(items, promised) {
+  if (!items.length) return `<div class="empty" style="border:0">${promised ? 'No open promises' : 'Not waiting on anyone'}</div>`;
+  const today = localDay(now());
+  const sorted = promised ? items.slice().sort((a, b) => (a.due ? (a.due < today ? 0 : a.due === today ? 1 : 2) : 3) - (b.due ? (b.due < today ? 0 : b.due === today ? 1 : 2) : 3) || String(a.due || '').localeCompare(String(b.due || ''))) : items;
+  return sorted.map((x) => `<div class="wl"><div class="ww"><div><span class="wh">${esc(x.who)}</span> <span class="wsub">· ${esc(x.subject)}${x.date ? ' · sent ' + esc(new Date(x.date + 'T12:00:00').toLocaleDateString([], { month: 'numeric', day: 'numeric' })) : ''}</span></div><div style="color:var(--soft)">${esc(x.what)}</div></div>${promised ? dueTag(x.due) : ''}</div>`).join('');
+}
+function renderEmail() {
+  const ms = mailState();
+  if (!ms) { $('email-body').innerHTML = '<div class="empty">No email snapshot is set up. See the README: set "mailSnapshot" in settings.json.</div>'; return; }
+  const d = ms.d, lr = ms.lr;
+  $('email-sub').textContent = d
+    ? `As of the last sort${ms.sortedAt ? ', ' + when(ms.sortedAt) : ''}. Newer mail, re-sorting and Undo are on the live Email Triage page.`
+    : 'No snapshot yet.';
+  $('email-live').innerHTML = liveLink(d);
+  const { warn, note } = mailWarnings(ms, true);
+  if (!d) { $('email-body').innerHTML = warn.map((w) => `<div class="mwarn">${w}</div>`).join(''); return; }
+  const c = d.counts;
+  const runLine = lr
+    ? `Last sort ${lr.status === 'ok' ? 'ran' : '<b style="color:#FFB0B0">stopped</b>'} ${esc(when(ms.sortedAt))}:${lr.counts.urgent} Urgent, ${lr.counts.todo} To-Do, ${lr.counts.fyi} FYI, ${lr.counts.noise} Noise${lr.counts.alreadyTagged ? `, ${lr.counts.alreadyTagged} already tagged` : ''}; ${lr.drafts} draft${lr.drafts === 1 ? '' : 's'} saved.`
+    : 'No run recorded yet.';
+  $('email-body').innerHTML = `
+    ${warn.map((w) => `<div class="mwarn">${w}</div>`).join('')}
+    <div class="side-card"><div style="display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline">
+      <span style="color:var(--soft)">${runLine}</span>
+      ${ms.next ? `<span class="meta" style="color:var(--dim);font-size:12px">Next sort ${esc(when(ms.next))}</span>` : ''}</div>
+      ${note ? `<div class="mnote">${esc(note)}</div>` : ''}
+      <div class="meta" style="color:var(--dim);font-size:12px">The board shows mail as of that sort. It never sends, moves or deletes mail; buttons open the message in Outlook.</div></div>
+    <div class="mtiles">
+      <div class="mtile"><b style="color:#FFB0B0">${c.urgent}</b><span>Urgent · last 7 days</span></div>
+      <div class="mtile"><b style="color:var(--amber-t)">${c.todo}</b><span>To-Do · last 7 days</span></div>
+      <div class="mtile"><b style="color:var(--teal)">${c.fyiToday}</b><span>FYI today</span></div>
+      <div class="mtile"><b style="color:#AEB7C9">${c.noiseToday}</b><span>Noise today</span></div>
+      <div class="mtile"><b style="color:#D4C8FF">${d.drafts.length}</b><span>Drafts waiting</span></div>
+    </div>
+    <div class="mcols">
+      <section><div class="col-h" style="margin-bottom:8px"><h2 style="color:#FFB0B0">Urgent</h2><span class="pill m-urg">${d.urgent.length}</span><span class="sp"></span><span class="note">newest first</span></div><div class="mlist">${threadRows(d.urgent, 'Urgent')}</div></section>
+      <section><div class="col-h" style="margin-bottom:8px"><h2 style="color:var(--amber-t)">To-Do</h2><span class="pill m-todo">${d.todo.length}</span><span class="sp"></span><span class="note">newest first</span></div><div class="mlist">${threadRows(d.todo, 'To-Do')}</div></section>
+    </div>
+    <section><div class="col-h" style="margin-bottom:8px"><h2 style="color:#D4C8FF">Drafts waiting</h2><span class="pill m-draft">${d.drafts.length}</span><span class="sp"></span><span class="note">Claude's drafts, not sent</span></div>
+      <div class="mlist">${d.drafts.length ? d.drafts.map((x) => `<div class="mthread"><div class="mrow"><div class="ms" data-mprev="${esc(prevKey(x))}" role="button" tabindex="0" aria-expanded="${openPreviews.has(prevKey(x))}" title="Click for a preview"><div class="sj"><span class="car" aria-hidden="true">▸</span>${esc(x.subject)}</div><div class="mf">To ${esc(x.to || '—')}</div></div>${x.webLink ? `<a class="btn" href="${esc(x.webLink)}" target="_blank" rel="noopener noreferrer">Open draft</a>` : ''}</div>${previewBox(x, 'The start of the draft as Claude saved it (your edits since then are not shown). Open the draft to review and send it yourself.')}</div>`).join('') : '<div class="empty" style="border:0">No drafts waiting</div>'}</div></section>
+    <div class="mcols">
+      <section><div class="col-h" style="margin-bottom:8px"><h2 style="color:var(--blue-t)">You promised</h2><span class="pill m-wait">${d.waiting.promised.length}</span></div><div class="mlist">${waitRows(d.waiting.promised, true)}</div></section>
+      <section><div class="col-h" style="margin-bottom:8px"><h2 style="color:var(--soft)">Waiting on others</h2><span class="pill m-noise">${d.waiting.others.length}</span></div><div class="mlist">${waitRows(d.waiting.others, false)}</div></section>
+    </div>
+    <div class="meta" style="color:var(--dim);font-size:12px">Snapshot written ${esc(when(ms.asOf))}${d.runStamp ? ` by run ${esc(d.runStamp)}` : ''}. Lists cover mail tagged since ${esc(when(Date.parse(d.since)))}.</div>`;
+}
+document.addEventListener('keydown', (ev) => {
+  const k = ev.target && ev.target.dataset && ev.target.dataset.mprev;
+  if (k && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); togglePreview(k); }
+});
+document.addEventListener('toggle', (ev) => {
+  const k = ev.target && ev.target.dataset && ev.target.dataset.thread;
+  if (k) { if (ev.target.open) openThreads.add(k); else openThreads.delete(k); }
+}, true);
+
+// ---------- usage ----------
+const kfmt = (n) => (n < 1e3 ? String(n) : n < 1e4 ? (n / 1e3).toFixed(1) + 'k' : n < 1e6 ? Math.round(n / 1e3) + 'k' : n < 1e9 ? (n / 1e6).toFixed(n < 1e7 ? 2 : 1) + 'M' : (n / 1e9).toFixed(2) + 'B');
+const allTok = (u) => u.input + u.output + u.cacheWrite + u.cacheRead;
+const hitRate = (u) => { const d = u.input + u.cacheWrite + u.cacheRead; return d ? Math.round((100 * u.cacheRead) / d) + '%' : '—'; };
+function renderUsageNav() {
+  const u = state.usage;
+  $('nav-usage').textContent = u && u.ready ? kfmt(allTok(u.today)) : '…';
+}
+function renderUsage() {
+  const u = state.usage;
+  if (!u || !u.ready) { $('usage-body').innerHTML = '<div class="empty">Reading your transcripts for the first time. This takes a minute or two; the page fills in when it\'s done.</div>'; return; }
+  const t = u.today, w = u.week;
+  const tile = (v, l, col) => `<div class="mtile"><b${col ? ` style="color:${col}"` : ''}>${v}</b><span>${l}</span></div>`;
+  const max = Math.max(1, ...u.days.map(allTok));
+  const today = localDay(now());
+  const dayName = (ds) => new Date(ds + 'T12:00:00').toLocaleDateString([], { weekday: 'short', day: 'numeric' });
+  const bars = u.days.map((d) => `<div class="ub${d.date === today ? ' today' : ''}" tabindex="0" data-day="${esc(d.date)}" aria-label="${esc(dayName(d.date))}: ${kfmt(allTok(d))} tokens, cache hit rate ${hitRate(d)}"><i style="height:${Math.max(allTok(d) ? 1 : 0, Math.round((100 * allTok(d)) / max))}%"></i></div>`).join('');
+  const row = (label, x, extra = '') => `<td>${kfmt(x.input)}</td><td>${kfmt(x.output)}</td><td>${kfmt(x.cacheWrite)}</td><td>${kfmt(x.cacheRead)}</td><td>${hitRate(x)}</td>${extra}`;
+  const sdot = (st) => (st === 'running' ? '<span class="sdot" style="background:var(--blue);display:inline-block;margin-right:6px"></span>' : st === 'needs' ? '<span class="sdot" style="background:var(--amber);display:inline-block;margin-right:6px"></span>' : '');
+  $('usage-body').innerHTML = `
+    <section><div class="h2row" style="margin-bottom:10px"><h2>Today</h2><span class="meta" style="color:var(--dim);font-size:12px">${t.messages} replies${u.scanning ? ' · updating…' : ''}</span></div>
+    <div class="utiles">
+      ${tile(kfmt(allTok(t)), 'Total tokens')}${tile(kfmt(t.input), 'Input (not cached)')}${tile(kfmt(t.output), 'Output')}
+      ${tile(kfmt(t.cacheWrite), 'Cache writes')}${tile(kfmt(t.cacheRead), 'Cache reads')}${tile(hitRate(t), 'Cache hit rate', 'var(--teal)')}
+    </div></section>
+    <section><div class="h2row" style="margin-bottom:10px"><h2>Last 7 days</h2><span class="meta" style="color:var(--dim);font-size:12px">${w.messages} replies</span></div>
+    <div class="utiles">
+      ${tile(kfmt(allTok(w)), 'Total tokens')}${tile(kfmt(w.input), 'Input (not cached)')}${tile(kfmt(w.output), 'Output')}
+      ${tile(kfmt(w.cacheWrite), 'Cache writes')}${tile(kfmt(w.cacheRead), 'Cache reads')}${tile(hitRate(w), 'Cache hit rate', 'var(--teal)')}
+    </div></section>
+    <section><div class="h2row" style="margin-bottom:10px"><h2>Tokens per day</h2><span class="meta" style="color:var(--dim);font-size:12px">last 14 days · today in amber · tallest ${kfmt(max)}</span></div>
+      <div class="uchart" id="uchart"><div class="ubars">${bars}</div><div class="uxl">${u.days.map((d) => `<span>${esc(dayName(d.date))}</span>`).join('')}</div><div class="utip" id="utip" hidden></div></div>
+      <details style="margin-top:8px" data-thread="usage-table"${openThreads.has('usage-table') ? ' open' : ''}><summary class="meta" style="cursor:pointer;color:var(--dim);font-size:12px">Show as a table</summary>
+        <div class="tbl" style="margin-top:8px"><table class="utbl"><thead><tr><th>Day</th><th>Input</th><th>Output</th><th>Cache writes</th><th>Cache reads</th><th>Hit rate</th><th>Total</th></tr></thead>
+        <tbody>${u.days.slice().reverse().map((d) => `<tr><td>${esc(dayName(d.date))}</td>${row('', d, `<td>${kfmt(allTok(d))}</td>`)}</tr>`).join('')}</tbody></table></div></details>
+    </section>
+    <section><div class="h2row" style="margin-bottom:10px"><h2>By model</h2><span class="meta" style="color:var(--dim);font-size:12px">last 7 days</span></div>
+      <div class="tbl"><table class="utbl"><thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Cache writes</th><th>Cache reads</th><th>Hit rate</th><th>Replies</th></tr></thead>
+      <tbody>${u.models.map((m) => `<tr><td style="font-family:var(--mono);font-size:12px">${esc(m.model)}</td>${row('', m, `<td>${m.messages}</td>`)}</tr>`).join('') || '<tr><td colspan="7">No usage in the last 7 days</td></tr>'}</tbody></table></div></section>
+    <section><div class="h2row" style="margin-bottom:10px"><h2>Sessions</h2><span class="meta" style="color:var(--dim);font-size:12px">active in the last 7 days, most recent first · subagents count toward their session</span></div>
+      <div class="tbl"><table class="utbl"><thead><tr><th>Session</th><th>Last active</th><th>Today</th><th>Input</th><th>Output</th><th>Cache writes</th><th>Cache reads</th><th>Hit rate</th><th>7-day total</th></tr></thead>
+      <tbody>${u.sessions.map((s) => `<tr class="click" data-focus="${esc(s.id)}"><td>${sdot(s.status)}${esc(s.title)}<div class="meta" style="color:var(--dim);font-size:12px">${esc([s.project, s.models.map((m) => m.replace(/^claude-/, '')).join(', ')].filter(Boolean).join(' · '))}</div></td><td>${esc(ago(s.lastAt))}</td><td>${allTok(s.today) ? kfmt(allTok(s.today)) : '—'}</td>${row('', s.week, `<td>${kfmt(allTok(s.week))}</td>`)}</tr>`).join('')}</tbody></table></div></section>
+    <div class="meta" style="color:var(--dim);font-size:12px;line-height:1.6">Input counts only tokens that weren't cached. Cache writes are tokens stored for reuse; cache reads are tokens served from the cache, which cost far less. Hit rate = cache reads ÷ (input + cache writes + cache reads). Your plan's usage limits aren't shown: only Anthropic's servers know them, and the board never reads your sign-in token.</div>`;
+}
+// Hover (or keyboard focus) on a day's bar shows its numbers.
+function usageTip(ev) {
+  const b = ev.target.closest && ev.target.closest('.ub');
+  const tip = $('utip');
+  if (!tip) return;
+  if (!b) { tip.hidden = true; return; }
+  const u = state.usage, d = u && u.days && u.days.find((x) => x.date === b.dataset.day);
+  if (!d) return;
+  tip.innerHTML = `<b>${esc(new Date(d.date + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' }))}</b><br>${kfmt(allTok(d))} tokens · ${d.messages} replies<br>input ${kfmt(d.input)} · output ${kfmt(d.output)}<br>cache writes ${kfmt(d.cacheWrite)} · reads ${kfmt(d.cacheRead)}<br>hit rate ${hitRate(d)}`;
+  const box = $('uchart').getBoundingClientRect(), r = b.querySelector('i').getBoundingClientRect();
+  tip.style.left = Math.min(box.width - 100, Math.max(100, r.left - box.left + r.width / 2)) + 'px';
+  tip.style.top = Math.max(70, r.top - box.top - 6) + 'px';
+  tip.hidden = false;
+}
+document.addEventListener('mouseover', usageTip);
+document.addEventListener('focusin', usageTip);
+
 // ---------- views ----------
 let view = 'overview';
 function setView() {
   const h = location.hash;
-  view = h.startsWith('#projects') ? 'projects' : h === '#sessions' ? 'sessions' : h.startsWith('#focus/') ? 'focus' : 'overview';
+  view = h.startsWith('#projects') ? 'projects' : h === '#sessions' ? 'sessions' : h === '#email' ? 'email' : h === '#usage' ? 'usage' : h.startsWith('#focus/') ? 'focus' : 'overview';
   if (h.startsWith('#projects/')) selProj = decodeURIComponent(h.slice('#projects/'.length));
   if (view === 'focus') {
     const id = decodeURIComponent(h.slice('#focus/'.length));
@@ -1147,6 +1471,8 @@ function setView() {
   $('view-overview').hidden = view !== 'overview';
   $('view-projects').hidden = view !== 'projects';
   $('view-sessions').hidden = view !== 'sessions';
+  $('view-email').hidden = view !== 'email';
+  $('view-usage').hidden = view !== 'usage';
   document.querySelectorAll('.vnav a').forEach((a) => a.setAttribute('aria-current', a.dataset.view === view ? 'page' : 'false'));
   render();
 }
@@ -1280,6 +1606,7 @@ document.addEventListener('click', (ev) => {
   const t = ev.target;
   const pick = (sel) => t.closest(sel);
   let x;
+  if ((x = pick('[data-mprev]')) && !t.closest('a[href]')) { togglePreview(x.dataset.mprev); return; }
   if ((x = pick('[data-focus]'))) { location.hash = '#focus/' + encodeURIComponent(x.dataset.focus); return; }
   if (t.id === 'focus-more') { focusShowAll = true; renderFocus(); return; }
   if ((x = pick('[data-select-proj]'))) { location.hash = '#projects/' + encodeURIComponent(x.dataset.selectProj); return; }

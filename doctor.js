@@ -183,7 +183,7 @@ function checkEvents() {
 
 function checkDataFiles() {
   const bad = [];
-  for (const f of ['settings.json', 'scratchpad.json', 'projects.json', 'archived.json', 'hidden.json']) {
+  for (const f of ['settings.json', 'scratchpad.json', 'projects.json', 'archived.json', 'hidden.json', 'done.json', 'usage.json']) {
     const p = path.join(DATA_DIR, f);
     if (!fs.existsSync(p)) continue;
     try { JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_) { bad.push(f); }
