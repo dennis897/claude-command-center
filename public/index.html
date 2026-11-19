@@ -287,6 +287,8 @@ a.btn{display:inline-flex;align-items:center;gap:6px;text-decoration:none;white-
 .mrow .sj{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
 .mrow .mf{font-size:12px;color:var(--dim);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .mrow .btn{height:30px;font-size:12px}
+.mrow .btn.mread.on{border-color:#2F6B45;color:#8FD6A8}
+.mchip.m-read{background:#17301F;color:#8FD6A8;white-space:nowrap}
 .mthread{border-bottom:1px solid #171D29}.mthread:last-child{border-bottom:0}
 .mthread .mrow{border-bottom:0}
 .mthread details{padding:0 14px 8px 14px}
@@ -1294,6 +1296,33 @@ function renderMailbar() {
     <span style="flex:1"></span>
     <a class="btn" href="#email">Open Email</a>${liveLink(d, 'Live page')}`;
 }
+// Mark read (only when the server has "mailRequests" set): one button per thread queues every
+// message in it that was unread at the last sort. The sorting job tags them "Mark read" on
+// its next run; the snapshot's markRead then lists them and the button becomes a chip.
+function mreadBtn(ms) {
+  const m = state.mail;
+  if (!m || !Array.isArray(m.requests)) return '';
+  const unread = ms.filter((x) => x.id && x.isRead === false).map((x) => x.id);
+  if (!unread.length) return '';
+  const tagged = new Set((m.data && m.data.markRead) || []);
+  const left = unread.filter((id) => !tagged.has(id));
+  if (!left.length) return '<span class="mchip m-read" title="Tagged Mark read in Outlook. Mark that view read in Outlook to clear it.">In Mark read</span>';
+  const queued = new Set(m.requests.map((r) => r.messageId));
+  const on = left.every((id) => queued.has(id));
+  const tip = on ? 'Queued: the next sort tags it Mark read in Outlook. Press to take it off the queue.'
+    : 'Unread at the last sort. Queues it: the next sort tags it Mark read in Outlook, then mark that view read there.';
+  return `<button class="btn mread${on ? ' on' : ''}" data-mread="${esc(left.join(' '))}" data-subj="${esc(ms[0].subject)}" aria-pressed="${on}" title="${esc(tip)}">${on ? 'Queued ✓' : 'Mark read'}</button>`;
+}
+async function markReadThread(btn) {
+  const ids = btn.dataset.mread.split(' ').filter(Boolean);
+  const cancel = btn.getAttribute('aria-pressed') === 'true';
+  btn.disabled = true;
+  for (const messageId of ids) {
+    const r = await api(cancel ? 'DELETE' : 'POST', '/api/mail/mark-read', { messageId, subject: btn.dataset.subj });
+    if (!r.ok) { btn.disabled = false; return; }
+  }
+  toast(cancel ? 'Taken off the Mark read queue' : 'Queued. The next sort tags it Mark read in Outlook');
+}
 function threadRows(list, kind) {
   const groups = new Map();
   for (const m of list) {
@@ -1311,7 +1340,7 @@ function threadRows(list, kind) {
     return `<div class="mthread">
       <div class="mrow"><div class="ms" data-mprev="${esc(tk)}" role="button" tabindex="0" aria-expanded="${openPreviews.has(tk)}" title="Click for a preview"><div class="sj"><span class="car" aria-hidden="true">▸</span>${esc(top.subject)}</div>
         <div class="mf"><span>${esc(top.from)}</span><span>${esc(when(Date.parse(top.receivedUtc)))}</span>${ms.length > 1 ? `<span>${ms.length} messages</span>` : ''}${ready ? '<span class="mchip m-draft">Draft ready</span>' : ''}</div></div>
-        ${openBtn(top)}</div>
+        ${mreadBtn(ms)}${openBtn(top)}</div>
       ${previewBox(top, MAIL_PREVIEW_NOTE)}
       ${ms.length > 1 ? `<details data-thread="${esc(key)}"${openThreads.has(key) ? ' open' : ''}><summary>Show ${ms.length - 1} earlier</summary>
         ${ms.slice(1).map((m) => `<div class="older" data-mprev="${esc(prevKey(m))}" role="button" tabindex="0" aria-expanded="${openPreviews.has(prevKey(m))}" title="Click for a preview"><span><span class="car" aria-hidden="true">▸</span>${esc(m.from)} · ${esc(when(Date.parse(m.receivedUtc)))}</span>${m.webLink ? `<a href="${esc(m.webLink)}" target="_blank" rel="noopener noreferrer">Open</a>` : ''}</div>${previewBox(m, MAIL_PREVIEW_NOTE)}`).join('')}</details>` : ''}
@@ -1366,7 +1395,7 @@ function renderEmail() {
       <span style="color:var(--soft)">${runLine}</span>
       ${ms.next ? `<span class="meta" style="color:var(--dim);font-size:12px">Next sort ${esc(when(ms.next))}</span>` : ''}</div>
       ${note ? `<div class="mnote">${esc(note)}</div>` : ''}
-      <div class="meta" style="color:var(--dim);font-size:12px">The board shows mail as of that sort. It never sends, moves or deletes mail; buttons open the message in Outlook.</div></div>
+      <div class="meta" style="color:var(--dim);font-size:12px">The board shows mail as of that sort. It never sends, moves or deletes mail; buttons open the message in Outlook${Array.isArray(ms.m.requests) ? ', and Mark read queues an unread email for the next sort to tag' : ''}.</div></div>
     <div class="mtiles">
       <div class="mtile"><b style="color:#FFB0B0">${c.urgent}</b><span>Urgent · last 7 days</span></div>
       <div class="mtile"><b style="color:var(--amber-t)">${c.todo}</b><span>To-Do · last 7 days</span></div>
@@ -1606,6 +1635,7 @@ document.addEventListener('click', (ev) => {
   const t = ev.target;
   const pick = (sel) => t.closest(sel);
   let x;
+  if ((x = pick('[data-mread]'))) { markReadThread(x); return; }
   if ((x = pick('[data-mprev]')) && !t.closest('a[href]')) { togglePreview(x.dataset.mprev); return; }
   if ((x = pick('[data-focus]'))) { location.hash = '#focus/' + encodeURIComponent(x.dataset.focus); return; }
   if (t.id === 'focus-more') { focusShowAll = true; renderFocus(); return; }

@@ -106,6 +106,14 @@ Point the board at the file in `~/.claude/command-center/settings.json` (or set 
 
 Only `https://` links are shown, and text is shown as text, never as HTML.
 
+**Mark read (optional).** The board can't change your mail, but it can pass a request to whatever writes the snapshot. Add `"mailRequests": "C:\\path\\to\\board-requests.json"` to `settings.json` (or set `CC_MAIL_REQUESTS`) and restart the server, and each thread with unread mail gets a **Mark read** button. It needs each message's `id` and `isRead` in the snapshot (`"urgent": [{"id": "…", "isRead": false, …}]`). Pressing it adds the message to that file; pressing **Queued ✓** takes it off again:
+
+```json
+{"updatedUtc": "…", "requests": [{"id": "r…", "action": "mark-read", "messageId": "…", "subject": "…", "at": "…"}]}
+```
+
+Your sorting job reads the file on its next run, acts on the requests (for example, tags the messages so you can mark them read in bulk), and lists the request ids it handled in the snapshot's `"requestsDone": ["r…"]`. The board then drops them from the file; only the board writes it. List message ids that are already handled in `"markRead": ["…"]` and the board shows **In Mark read** instead of the button. Requests need the `X-CC` header like every other change.
+
 ## Projects (hub)
 
 The server reads every transcript in `~/.claude/projects`. It reads each file once at startup (about 1–2 s for 180 MB) and after that only new lines, every 10 s. From the transcripts it gets each session's title (your rename first, then Claude's generated one), branch, host, prompt count, cost and lines changed.

@@ -889,6 +889,34 @@ function addRememberedDone(list) {
 // board show the next run and warn when one was missed.
 let mail = { file: null, ok: false, error: null, data: null, mtime: 0, size: -1, fails: 0 };
 let mailRetry = null;
+// Mark read (optional): the board can't change mail itself. With "mailRequests" set to a
+// file path (or CC_MAIL_REQUESTS), the Email page's Mark read button adds the message's id
+// to that file. The job that writes the snapshot reads it on its next run, tags those
+// messages, and lists the request ids it handled in the snapshot's "requestsDone"; the
+// board then drops them from the file. The snapshot's "markRead" lists unread messages
+// already tagged, so the board can show them as such. Only this server writes the file.
+const MSG_ID = /^[A-Za-z0-9+/=_-]{10,512}$/;
+const mailReqFile = () => (typeof settings.mailRequests === 'string' && settings.mailRequests) || process.env.CC_MAIL_REQUESTS || null;
+let mailReqs = []; // [{id, action: 'mark-read', messageId, subject, at}]
+function loadMailReqs() {
+  const f = mailReqFile();
+  if (!f) return;
+  const j = readJsonSafe(f);
+  mailReqs = (Array.isArray(j.requests) ? j.requests : [])
+    .filter((r) => r && r.action === 'mark-read' && typeof r.id === 'string' && MSG_ID.test(r.messageId || ''))
+    .slice(0, 500);
+}
+function saveMailReqs() {
+  const f = mailReqFile();
+  if (f) writeJson(f, { updatedUtc: new Date().toISOString(), requests: mailReqs });
+}
+function pruneMailReqs() {
+  if (!mailReqFile() || !mail.data) return;
+  const done = new Set(mail.data.requestsDone);
+  const before = mailReqs.length;
+  mailReqs = mailReqs.filter((r) => !done.has(r.id));
+  if (mailReqs.length !== before) saveMailReqs();
+}
 const mailFile = () => (typeof settings.mailSnapshot === 'string' && settings.mailSnapshot) || process.env.CC_MAIL_SNAPSHOT || null;
 const httpsUrl = (v) => (typeof v === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(v) ? v.slice(0, 2000) : null);
 const isoTime = (v) => { const t = typeof v === 'string' ? Date.parse(v) : NaN; return Number.isFinite(t) ? new Date(t).toISOString() : null; };
@@ -899,7 +927,9 @@ function cleanMail(j) {
   const list = (a, f, n) => (Array.isArray(a) ? a.filter((x) => x && typeof x === 'object').slice(0, n).map(f) : []);
   // A preview is the first lines of the email, as the sorter's search returned them; shown as text only.
   const preview = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, 600) : '');
-  const msg = (m) => ({ subject: s(m.subject, 300) || '(no subject)', from: s(m.from, 160), receivedUtc: isoTime(m.receivedUtc), webLink: httpsUrl(m.webLink), draftReady: m.draftReady === true, preview: preview(m.preview) });
+  const msg = (m) => ({ subject: s(m.subject, 300) || '(no subject)', from: s(m.from, 160), receivedUtc: isoTime(m.receivedUtc), webLink: httpsUrl(m.webLink), draftReady: m.draftReady === true, preview: preview(m.preview),
+    id: typeof m.id === 'string' && MSG_ID.test(m.id) ? m.id : null, isRead: typeof m.isRead === 'boolean' ? m.isRead : null });
+  const ids = (a, re, n) => (Array.isArray(a) ? a.filter((x) => typeof x === 'string' && re.test(x)).slice(0, n) : []);
   const item = (x) => ({ id: s(x.id, 120), who: s(x.who, 200), date: ymd(x.date), subject: s(x.subject, 300), what: s(x.what, 600), due: ymd(x.due) });
   const lr = j.lastRun && typeof j.lastRun === 'object' ? j.lastRun : null;
   const lc = (lr && lr.counts) || {};
@@ -919,6 +949,7 @@ function cleanMail(j) {
     drafts: list(j.drafts, (d) => ({ subject: s(d.subject, 300) || '(no subject)', to: s(d.to, 300), webLink: httpsUrl(d.webLink), preview: preview(d.preview) }), 100),
     waiting: { promised: list(w.promised, item, 80), others: list(w.others, item, 80), refreshed: s(w.refreshed, 40) || null, updatedUtc: isoTime(w.updatedUtc) },
     page: httpsUrl(j.page),
+    requestsDone: ids(j.requestsDone, /^[\w-]{1,80}$/, 1000), markRead: ids(j.markRead, MSG_ID, 1000),
   };
 }
 function loadMail() {
@@ -934,6 +965,7 @@ function loadMail() {
     data = cleanMail(j);
   } catch (_) { return mailFailed(file, 'unreadable'); }
   mail = { file, ok: true, error: null, data, mtime: st.mtimeMs, size: st.size, fails: 0, readAt: Date.now() };
+  pruneMailReqs();
   push();
 }
 function mailFailed(file, why) {
@@ -952,7 +984,8 @@ function mailSchedule() {
 }
 function mailView() {
   if (!mailFile()) return null;
-  return { file: mail.file || mailFile(), ok: mail.ok, error: mail.error, data: mail.data, readAt: mail.readAt || null, schedule: mailSchedule() };
+  return { file: mail.file || mailFile(), ok: mail.ok, error: mail.error, data: mail.data, readAt: mail.readAt || null, schedule: mailSchedule(),
+    requests: mailReqFile() ? mailReqs.map((r) => ({ id: r.id, messageId: r.messageId, at: r.at })) : null };
 }
 
 // ---------- token and cache usage ----------
@@ -1288,6 +1321,24 @@ const server = http.createServer((req, res) => {
       json(res, 204);
     }).catch(() => json(res, 400, { error: 'bad request' }));
   }
+  // Mark read: queue a message (POST) or take it off the queue (DELETE). Only the message
+  // id and its subject are kept; the sorting job does the tagging.
+  if (url.pathname === '/api/mail/mark-read' && (req.method === 'POST' || req.method === 'DELETE')) {
+    if (!mailReqFile()) return json(res, 404, { error: 'mailRequests is not set' });
+    return readBody(req).then((body) => {
+      const messageId = typeof body.messageId === 'string' ? body.messageId : '';
+      if (!MSG_ID.test(messageId)) return json(res, 400, { error: 'bad message id' });
+      loadMailReqs();
+      if (req.method === 'DELETE') mailReqs = mailReqs.filter((r) => r.messageId !== messageId);
+      else if (!mailReqs.some((r) => r.messageId === messageId)) {
+        if (mailReqs.length >= 500) return json(res, 409, { error: 'queue full' });
+        mailReqs.push({ id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), action: 'mark-read', messageId,
+          subject: (str(body.subject, 300) || '').replace(/\s+/g, ' ').trim(), at: new Date().toISOString() });
+      }
+      saveMailReqs(); push();
+      json(res, 204);
+    }).catch(() => json(res, 400, { error: 'bad request' }));
+  }
   // Open a session in the Claude desktop app. Only an id the app itself recorded can be
   // opened, and the link is fixed: claude://code/continue?session=local_<id>.
   const om = /^\/api\/sessions\/([\w-]+)\/open-in-app$/.exec(url.pathname);
@@ -1355,6 +1406,7 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.watchFile(EVENTS, { interval: 400 }, () => { if (readNew(true)) push(); });
 // Email snapshot: read now, then again whenever the file changes.
 if (mailFile()) {
+  loadMailReqs();
   loadMail();
   fs.watchFile(mailFile(), { interval: 2000 }, () => { mail.fails = 0; loadMail(); });
 }
